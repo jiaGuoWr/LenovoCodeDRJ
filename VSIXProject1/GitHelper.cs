@@ -126,8 +126,24 @@ namespace VSIXProject1
             }
         }
 
-        private bool CheckGitInSubdirectoriesRecursive(string directory)
+        // 需要排除的目录（性能优化）
+        private static readonly HashSet<string> EXCLUDED_DIRECTORIES = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
         {
+            "bin", "obj", "node_modules", ".git", "packages", "testresults", "artifacts", ".vs"
+        };
+
+        // 最大递归深度限制
+        private const int MAX_DIRECTORY_DEPTH = 5;
+
+        private bool CheckGitInSubdirectoriesRecursive(string directory, int currentDepth = 0)
+        {
+            // 限制递归深度，避免在大型代码库中性能问题
+            if (currentDepth >= MAX_DIRECTORY_DEPTH)
+            {
+                System.Diagnostics.Debug.WriteLine($"CheckGitInSubdirectoriesRecursive: 达到最大深度限制 {MAX_DIRECTORY_DEPTH}, 停止遍历: {directory}");
+                return false;
+            }
+
             try
             {
                 // 检查当前目录
@@ -140,8 +156,15 @@ namespace VSIXProject1
                 var subDirectories = Directory.EnumerateDirectories(directory);
                 foreach (var subDir in subDirectories)
                 {
+                    // 跳过排除的目录
+                    string dirName = Path.GetFileName(subDir);
+                    if (EXCLUDED_DIRECTORIES.Contains(dirName))
+                    {
+                        continue;
+                    }
+
                     // 递归检查子目录
-                    if (CheckGitInSubdirectoriesRecursive(subDir))
+                    if (CheckGitInSubdirectoriesRecursive(subDir, currentDepth + 1))
                     {
                         return true;
                     }
@@ -292,8 +315,15 @@ namespace VSIXProject1
             }
         }
 
-        private string GetGitRootFromSubdirectoriesRecursive(string directory)
+        private string GetGitRootFromSubdirectoriesRecursive(string directory, int currentDepth = 0)
         {
+            // 限制递归深度，避免在大型代码库中性能问题
+            if (currentDepth >= MAX_DIRECTORY_DEPTH)
+            {
+                System.Diagnostics.Debug.WriteLine($"GetGitRootFromSubdirectoriesRecursive: 达到最大深度限制 {MAX_DIRECTORY_DEPTH}, 停止遍历: {directory}");
+                return null;
+            }
+
             try
             {
                 // 检查当前目录
@@ -307,8 +337,15 @@ namespace VSIXProject1
                 var subDirectories = Directory.EnumerateDirectories(directory);
                 foreach (var subDir in subDirectories)
                 {
+                    // 跳过排除的目录
+                    string dirName = Path.GetFileName(subDir);
+                    if (EXCLUDED_DIRECTORIES.Contains(dirName))
+                    {
+                        continue;
+                    }
+
                     // 递归检查子目录
-                    gitRoot = GetGitRootFromSubdirectoriesRecursive(subDir);
+                    gitRoot = GetGitRootFromSubdirectoriesRecursive(subDir, currentDepth + 1);
                     if (!string.IsNullOrEmpty(gitRoot))
                     {
                         return gitRoot;
@@ -624,27 +661,136 @@ namespace VSIXProject1
             }
         }
 
-        // 复合的 Disposable 类，用于管理多个 IDisposable
-        private class CompositeDisposable : IDisposable
+        // 安全的 FileSystemWatcher 包装类，确保事件正确取消订阅
+        private class SafeFileSystemWatcher : IDisposable
         {
-            private readonly List<IDisposable> _disposables;
+            private FileSystemWatcher _watcher;
+            private FileSystemEventHandler _changedHandler;
+            private FileSystemEventHandler _createdHandler;
+            private FileSystemEventHandler _deletedHandler;
+            private RenamedEventHandler _renamedHandler;
+            private readonly object _lock = new object();
+            private bool _disposed;
 
-            public CompositeDisposable(List<IDisposable> disposables)
+            public SafeFileSystemWatcher(string path, string filter = "*.*")
             {
-                _disposables = disposables;
+                _watcher = new FileSystemWatcher(path, filter)
+                {
+                    EnableRaisingEvents = false // 先禁用，等事件订阅完成后再启用
+                };
+            }
+
+            public FileSystemWatcher Watcher => _watcher;
+
+            public void SubscribeChanged(FileSystemEventHandler handler)
+            {
+                lock (_lock)
+                {
+                    if (_disposed) return;
+                    _changedHandler = handler;
+                    _watcher.Changed += _changedHandler;
+                }
+            }
+
+            public void SubscribeCreated(FileSystemEventHandler handler)
+            {
+                lock (_lock)
+                {
+                    if (_disposed) return;
+                    _createdHandler = handler;
+                    _watcher.Created += _createdHandler;
+                }
+            }
+
+            public void SubscribeDeleted(FileSystemEventHandler handler)
+            {
+                lock (_lock)
+                {
+                    if (_disposed) return;
+                    _deletedHandler = handler;
+                    _watcher.Deleted += _deletedHandler;
+                }
+            }
+
+            public void SubscribeRenamed(RenamedEventHandler handler)
+            {
+                lock (_lock)
+                {
+                    if (_disposed) return;
+                    _renamedHandler = handler;
+                    _watcher.Renamed += _renamedHandler;
+                }
+            }
+
+            public void Start()
+            {
+                lock (_lock)
+                {
+                    if (!_disposed && _watcher != null)
+                    {
+                        _watcher.EnableRaisingEvents = true;
+                    }
+                }
             }
 
             public void Dispose()
             {
+                lock (_lock)
+                {
+                    if (_disposed) return;
+                    _disposed = true;
+
+                    if (_watcher != null)
+                    {
+                        _watcher.EnableRaisingEvents = false;
+
+                        // 显式取消事件订阅
+                        if (_changedHandler != null)
+                            _watcher.Changed -= _changedHandler;
+                        if (_createdHandler != null)
+                            _watcher.Created -= _createdHandler;
+                        if (_deletedHandler != null)
+                            _watcher.Deleted -= _deletedHandler;
+                        if (_renamedHandler != null)
+                            _watcher.Renamed -= _renamedHandler;
+
+                        _watcher.Dispose();
+                        _watcher = null;
+                    }
+
+                    _changedHandler = null;
+                    _createdHandler = null;
+                    _deletedHandler = null;
+                    _renamedHandler = null;
+                }
+            }
+        }
+
+        // 复合的 Disposable 类，用于管理多个 IDisposable
+        private class CompositeDisposable : IDisposable
+        {
+            private readonly List<IDisposable> _disposables;
+            private readonly object _lock = new object();
+            private bool _disposed;
+
+            public CompositeDisposable(List<IDisposable> disposables)
+            {
+                _disposables = disposables ?? new List<IDisposable>();
+            }
+
+            public void Dispose()
+            {
+                lock (_lock)
+                {
+                    if (_disposed) return;
+                    _disposed = true;
+                }
+
                 foreach (var disposable in _disposables)
                 {
                     try
                     {
-                        if (disposable is FileSystemWatcher watcher)
-                        {
-                            watcher.EnableRaisingEvents = false;
-                        }
-                        disposable.Dispose();
+                        disposable?.Dispose();
                     }
                     catch (Exception ex)
                     {

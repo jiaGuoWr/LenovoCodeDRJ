@@ -12,6 +12,7 @@ using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Diagnostics;
 using System.Collections.Generic;
+using Microsoft.CodeAnalysis.Text;
 
 [DiagnosticAnalyzer(LanguageNames.CSharp)]
 public class LenovoQiraCodeAnalyzerAnalyzer : DiagnosticAnalyzer
@@ -73,10 +74,21 @@ public class LenovoQiraCodeAnalyzerAnalyzer : DiagnosticAnalyzer
         isEnabledByDefault: true,
         description: "不应在代码中明文存储密码、Token、密钥等敏感信息，建议使用配置文件或环境变量");
 
+    public const string PathTraversalId = "SEC002";
+    private static readonly DiagnosticDescriptor PathTraversalRule = new DiagnosticDescriptor(
+        PathTraversalId,
+        "不受控制的搜索路径（路径遍历风险）",
+        "检测到不受控制的搜索路径: {0}",
+        "Security",
+        DiagnosticSeverity.Warning,
+        isEnabledByDefault: true,
+        description: "永远不要直接使用用户输入作为路径，可能导致路径遍历攻击。应验证路径是否在允许的目录内");
+
     public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics
         => ImmutableArray.Create(Rule, MissingDllImportSearchPathsRule, InvalidStackTraceUsageRule, UnsafeDllSignatureRule,
             InvalidCommentedCodeRule,
-            SensitiveInfoInCodeRule);
+            SensitiveInfoInCodeRule,
+            PathTraversalRule);
 
     private static readonly HashSet<string> SensitiveKeywords = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
     {
@@ -100,6 +112,11 @@ public class LenovoQiraCodeAnalyzerAnalyzer : DiagnosticAnalyzer
 
         context.RegisterSyntaxNodeAction(AnalyzeVariableDeclaration, SyntaxKind.VariableDeclaration);
         context.RegisterSyntaxNodeAction(AnalyzeAssignmentExpression, SyntaxKind.SimpleAssignmentExpression);
+
+        // 注册路径遍历检测
+        context.RegisterSyntaxNodeAction(AnalyzePathTraversal, SyntaxKind.InvocationExpression);
+        context.RegisterSyntaxNodeAction(AnalyzePathTraversalInBinaryExpression, SyntaxKind.AddExpression);
+        context.RegisterSyntaxNodeAction(AnalyzePathTraversalInInterpolation, SyntaxKind.InterpolatedStringExpression);
     }
 
     private void AnalyzeSyntaxTreeForChineseComments(SyntaxTreeAnalysisContext context)
@@ -175,14 +192,15 @@ public class LenovoQiraCodeAnalyzerAnalyzer : DiagnosticAnalyzer
 
             var searchPath = GetSearchPathFromAttributes(method, context);
 
-            var dllPath = FindDllPath(dllName, searchPath);
+            // 严格模式查找：只在指定路径中查找，不回退到系统目录
+            var dllPath = FindDllPathStrict(dllName, searchPath);
 
             if (dllPath == null)
             {
                 context.ReportDiagnostic(Diagnostic.Create(
                     UnsafeDllSignatureRule,
                     dllImportAttr.GetLocation(),
-                    $"{dllName}（未找到该DLL文件）"));
+                    $"{dllName}（在指定搜索路径中未找到）"));
                 continue;
             }
 
@@ -203,24 +221,37 @@ public class LenovoQiraCodeAnalyzerAnalyzer : DiagnosticAnalyzer
 
         try
         {
+            // 严格模式验证：验证证书链完整性和有效期
             X509Certificate cert = X509Certificate.CreateFromSignedFile(dllPath);
             if (cert == null)
                 return false;
 
+            // 转换为 X509Certificate2 以支持链验证
             X509Certificate2 cert2 = new X509Certificate2(cert);
-            if (cert2 == null)
-                return false;
 
+            // 验证证书是否在有效期内
+            DateTime now = DateTime.Now;
+            if (cert2.NotBefore > now || cert2.NotAfter < now)
+            {
+                return false; // 证书已过期或尚未生效
+            }
+
+            // 构建并验证证书链
             X509Chain chain = new X509Chain();
-            chain.ChainPolicy.RevocationMode = X509RevocationMode.NoCheck;
-            return chain.Build(cert2);
+            chain.ChainPolicy.RevocationMode = X509RevocationMode.NoCheck; // 不检查吊销，避免网络依赖
+            chain.ChainPolicy.VerificationFlags = X509VerificationFlags.NoFlag;
+
+            bool isChainValid = chain.Build(cert2);
+            if (!isChainValid)
+            {
+                return false; // 证书链验证失败
+            }
+
+            return true;
         }
         catch (CryptographicException)
         {
-            return false;
-        }
-        catch (InvalidCastException)
-        {
+            // 文件没有签名或签名格式无效
             return false;
         }
         catch (Exception)
@@ -231,9 +262,6 @@ public class LenovoQiraCodeAnalyzerAnalyzer : DiagnosticAnalyzer
 
     private string GetSearchPathFromAttributes(MethodDeclarationSyntax method, SyntaxNodeAnalysisContext context)
     {
-        const string PROJECT_TOP_FOLDER_NAME = "WpfApp1";
-        const string RELATIVE_OUTPUT_PATH = "bin\\Debug\\net8.0-windows";
-
         try
         {
             var searchPathAttr = method.AttributeLists
@@ -266,11 +294,16 @@ public class LenovoQiraCodeAnalyzerAnalyzer : DiagnosticAnalyzer
                         string codeFilePath = context.Node.SyntaxTree.FilePath;
                         if (!string.IsNullOrEmpty(codeFilePath))
                         {
-                            string projectTopDir = FindProjectTopDirectory(codeFilePath, PROJECT_TOP_FOLDER_NAME);
-                            if (!string.IsNullOrEmpty(projectTopDir))
+                            string projectDir = FindProjectTopDirectory(codeFilePath);
+                            if (!string.IsNullOrEmpty(projectDir))
                             {
-                                string dllDir = Path.Combine(projectTopDir, RELATIVE_OUTPUT_PATH);
-                                if (Directory.Exists(dllDir)) paths.Add(dllDir);
+                                // 探测多个可能的输出路径
+                                var possiblePaths = GetPossibleOutputPaths(projectDir);
+                                foreach (var dllDir in possiblePaths)
+                                {
+                                    if (Directory.Exists(dllDir))
+                                        paths.Add(dllDir);
+                                }
                             }
                         }
                         break;
@@ -291,26 +324,135 @@ public class LenovoQiraCodeAnalyzerAnalyzer : DiagnosticAnalyzer
         }
     }
 
-    private string FindProjectTopDirectory(string codeFilePath, string topFolderName)
+    private string FindProjectTopDirectory(string codeFilePath)
     {
         try
         {
             string currentDir = Path.GetDirectoryName(codeFilePath);
-            for (int i = 0; i < 10; i++)
+
+            // 向上搜索目录树，查找包含 .csproj 文件的目录
+            for (int i = 0; i < 15; i++)
             {
                 if (string.IsNullOrEmpty(currentDir)) break;
-                if (new DirectoryInfo(currentDir).Name.Equals(topFolderName, StringComparison.OrdinalIgnoreCase))
+
+                // 查找项目文件 (.csproj)
+                var projectFiles = Directory.GetFiles(currentDir, "*.csproj");
+                if (projectFiles.Length > 0)
                 {
                     return currentDir;
                 }
+
                 currentDir = Directory.GetParent(currentDir)?.FullName;
             }
+
+            // 回退：返回代码文件所在目录
             return Path.GetDirectoryName(codeFilePath);
         }
         catch
         {
             return null;
         }
+    }
+
+    private IEnumerable<string> GetPossibleOutputPaths(string projectDir)
+    {
+        var paths = new List<string>();
+
+        // 常见构建配置
+        var configurations = new[] { "Debug", "Release" };
+
+        // 常见目标框架 - .NET Core/5/6/7/8+
+        var targetFrameworks = new[]
+        {
+            "net9.0-windows",
+            "net9.0",
+            "net8.0-windows",
+            "net8.0",
+            "net7.0-windows",
+            "net7.0",
+            "net6.0-windows",
+            "net6.0",
+            "net5.0-windows",
+            "net5.0",
+            "netcoreapp3.1",
+            "netcoreapp3.0",
+            "netcoreapp2.2",
+            "netcoreapp2.1",
+            "netcoreapp2.0",
+            "netcoreapp1.1",
+            "netcoreapp1.0"
+        };
+
+        // .NET Framework
+        var netFrameworks = new[]
+        {
+            "net48",
+            "net472",
+            "net471",
+            "net47",
+            "net462",
+            "net461",
+            "net46",
+            "net452",
+            "net451",
+            "net45",
+            "net40",
+            "net35",
+            "net20"
+        };
+
+        foreach (var config in configurations)
+        {
+            // 添加 .NET Core/5+ 路径
+            foreach (var tfm in targetFrameworks)
+            {
+                paths.Add(Path.Combine(projectDir, "bin", config, tfm));
+            }
+
+            // 添加 .NET Framework 路径
+            foreach (var tfm in netFrameworks)
+            {
+                paths.Add(Path.Combine(projectDir, "bin", config, tfm));
+            }
+
+            // 也尝试没有子目录的传统路径
+            paths.Add(Path.Combine(projectDir, "bin", config));
+        }
+
+        // 添加 obj 目录（某些项目可能在此生成 DLL）
+        paths.Add(Path.Combine(projectDir, "obj"));
+
+        return paths;
+    }
+
+    /// <summary>
+    /// 严格模式查找 DLL：只在指定路径中查找，不回退到系统目录
+    /// </summary>
+    private string FindDllPathStrict(string dllName, string searchPath)
+    {
+        if (string.IsNullOrEmpty(dllName)) return null;
+
+        // 如果没有指定搜索路径，使用默认行为（系统目录）
+        if (string.IsNullOrEmpty(searchPath))
+        {
+            string systemPath = Environment.GetFolderPath(Environment.SpecialFolder.System);
+            string systemDllPath = Path.Combine(systemPath, dllName);
+            if (File.Exists(systemDllPath)) return systemDllPath;
+            return null;
+        }
+
+        // 只在指定路径中查找，不回退到系统目录
+        foreach (var path in searchPath.Split(';'))
+        {
+            if (string.IsNullOrEmpty(path) || !Directory.Exists(path)) continue;
+            string fullPath = Path.Combine(path, dllName);
+            if (File.Exists(fullPath)) return fullPath;
+            string archDllPath = Path.Combine(path, $"{Path.GetFileNameWithoutExtension(dllName)}.x64{Path.GetExtension(dllName)}");
+            if (File.Exists(archDllPath)) return archDllPath;
+        }
+
+        // 在指定路径中未找到，返回 null（不回退到系统目录）
+        return null;
     }
 
     private string FindDllPath(string dllName, string searchPath)
@@ -398,27 +540,26 @@ public class LenovoQiraCodeAnalyzerAnalyzer : DiagnosticAnalyzer
         if (context.CancellationToken.IsCancellationRequested) return;
 
         var root = context.Tree.GetRoot();
-        var codePattern = new Regex(
-            @"\b(if|else|for|while|public|private|protected|class|void|int|string|bool|object|var|return)\b" +
-            @"|[\{\}\(\);=\+\-\*\/<>]|;=",
-            RegexOptions.Compiled);
+        var allTrivias = root.DescendantTrivia(descendIntoTrivia: true).ToList();
+        var processedSpans = new HashSet<int>();
 
-        foreach (var trivia in root.DescendantTrivia(descendIntoTrivia: true))
+        for (int i = 0; i < allTrivias.Count; i++)
         {
+            var trivia = allTrivias[i];
+
+            // 跳过已处理的trivia
+            if (processedSpans.Contains(trivia.Span.Start))
+                continue;
+
             string rawText = trivia.ToString().Trim();
             if (string.IsNullOrWhiteSpace(rawText)) continue;
 
-            if (!trivia.IsKind(SyntaxKind.SingleLineCommentTrivia) &&
-                !trivia.IsKind(SyntaxKind.MultiLineCommentTrivia) &&
-                !trivia.IsKind(SyntaxKind.DocumentationCommentExteriorTrivia))
-                continue;
-
-            string commentText = ExtractCommentText(rawText, trivia.Kind());
-
-            if (codePattern.IsMatch(commentText))
+            // 处理多行块注释 /* */
+            if (trivia.IsKind(SyntaxKind.MultiLineCommentTrivia))
             {
-                var matches = codePattern.Matches(commentText);
-                if (matches.Count >= 2)
+                string commentText = ExtractCommentText(rawText, trivia.Kind());
+                // 块注释按1行处理，主要检查长度
+                if (IsLargeCodeBlock(commentText, 1))
                 {
                     var location = Location.Create(context.Tree, trivia.Span);
                     context.ReportDiagnostic(Diagnostic.Create(
@@ -426,8 +567,99 @@ public class LenovoQiraCodeAnalyzerAnalyzer : DiagnosticAnalyzer
                         location,
                         TruncateLongText(commentText, 50)));
                 }
+                processedSpans.Add(trivia.Span.Start);
+                continue;
+            }
+
+            // 跳过文档注释
+            if (trivia.IsKind(SyntaxKind.DocumentationCommentExteriorTrivia))
+            {
+                processedSpans.Add(trivia.Span.Start);
+                continue;
+            }
+
+            // 处理单行注释 // 以及连续的多行注释块
+            if (trivia.IsKind(SyntaxKind.SingleLineCommentTrivia))
+            {
+                // 收集连续的单行注释
+                var commentGroup = new List<SyntaxTrivia> { trivia };
+                processedSpans.Add(trivia.Span.Start);
+
+                // 获取当前注释的行号
+                int currentLine = trivia.GetLocation().GetLineSpan().StartLinePosition.Line;
+
+                // 向后查找连续的单行注释（按行号判断连续性）
+                int j = i + 1;
+                while (j < allTrivias.Count)
+                {
+                    var nextTrivia = allTrivias[j];
+
+                    // 跳过空白和换行
+                    if (nextTrivia.IsKind(SyntaxKind.EndOfLineTrivia) ||
+                        nextTrivia.IsKind(SyntaxKind.WhitespaceTrivia))
+                    {
+                        j++;
+                        continue;
+                    }
+
+                    // 如果是另一个单行注释，检查行号是否连续
+                    if (nextTrivia.IsKind(SyntaxKind.SingleLineCommentTrivia) &&
+                        !processedSpans.Contains(nextTrivia.Span.Start))
+                    {
+                        int nextLine = nextTrivia.GetLocation().GetLineSpan().StartLinePosition.Line;
+
+                        // 只有行号连续（相差1）才算连续注释
+                        if (nextLine == currentLine + 1)
+                        {
+                            commentGroup.Add(nextTrivia);
+                            processedSpans.Add(nextTrivia.Span.Start);
+                            currentLine = nextLine;
+                            j++;
+                        }
+                        else
+                        {
+                            // 行号不连续，断开
+                            break;
+                        }
+                    }
+                    else
+                    {
+                        break;
+                    }
+                }
+
+                // 合并注释文本
+                var combinedText = string.Join("\n", commentGroup.Select(t =>
+                    ExtractCommentText(t.ToString().Trim(), SyntaxKind.SingleLineCommentTrivia)));
+
+                if (IsLargeCodeBlock(combinedText, commentGroup.Count))
+                {
+                    var spanStart = commentGroup.First().Span.Start;
+                    var spanEnd = commentGroup.Last().Span.End;
+                    var location = Location.Create(context.Tree, new TextSpan(spanStart, spanEnd - spanStart));
+                    context.ReportDiagnostic(Diagnostic.Create(
+                        InvalidCommentedCodeRule,
+                        location,
+                        TruncateLongText(combinedText, 50)));
+                }
             }
         }
+    }
+
+    private bool IsLargeCodeBlock(string text, int lineCount)
+    {
+        if (string.IsNullOrWhiteSpace(text))
+            return false;
+
+        // 条件1: 单行超过80字符
+        if (text.Length >= 180)
+            return true;
+
+        // 条件2: 连续大于3行（即4行及以上）的注释代码
+        if (lineCount > 10)
+            return true;
+
+        return false;
     }
 
     private string ExtractCommentText(string rawText, SyntaxKind kind)
@@ -499,5 +731,193 @@ public class LenovoQiraCodeAnalyzerAnalyzer : DiagnosticAnalyzer
     private bool IsSensitiveVariableName(string variableName)
     {
         return SensitiveKeywords.Any(keyword => variableName.IndexOf(keyword, StringComparison.OrdinalIgnoreCase) >= 0);
+    }
+
+    // 路径遍历检测相关关键字
+    private static readonly HashSet<string> PathTraversalKeywords = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+    {
+        "input", "userinput", "request", "query", "param", "parameter",
+        "arg", "argument", "data", "content", "text", "value",
+        "path", "filepath", "filename", "file", "url", "uri"
+    };
+
+    /// <summary>
+    /// 检测 Path.Combine 等路径拼接方法调用中的路径遍历风险
+    /// </summary>
+    private void AnalyzePathTraversal(SyntaxNodeAnalysisContext context)
+    {
+        var invocation = (InvocationExpressionSyntax)context.Node;
+
+        // 检测 Path.Combine, Path.Join 等方法
+        var methodName = GetMethodName(invocation);
+        if (string.IsNullOrEmpty(methodName))
+            return;
+
+        // 检查是否是路径相关方法
+        if (!IsPathRelatedMethod(methodName))
+            return;
+
+        // 检查参数中是否包含可疑输入
+        foreach (var arg in invocation.ArgumentList.Arguments)
+        {
+            if (IsSuspiciousPathArgument(arg.Expression))
+            {
+                context.ReportDiagnostic(Diagnostic.Create(
+                    PathTraversalRule,
+                    arg.GetLocation(),
+                    $"方法 {methodName} 使用了可能包含用户输入的参数，存在路径遍历风险"));
+                return;
+            }
+        }
+    }
+
+    /// <summary>
+    /// 检测字符串拼接中的路径遍历风险
+    /// </summary>
+    private void AnalyzePathTraversalInBinaryExpression(SyntaxNodeAnalysisContext context)
+    {
+        var binaryExpr = (BinaryExpressionSyntax)context.Node;
+
+        // 检查是否是字符串拼接
+        if (!binaryExpr.OperatorToken.IsKind(SyntaxKind.PlusToken))
+            return;
+
+        // 检查是否包含路径相关关键字或变量
+        if (ContainsPathVariable(binaryExpr.Left) || ContainsPathVariable(binaryExpr.Right))
+        {
+            // 检查另一侧是否包含可疑输入
+            if (IsSuspiciousPathArgument(binaryExpr.Left) || IsSuspiciousPathArgument(binaryExpr.Right))
+            {
+                context.ReportDiagnostic(Diagnostic.Create(
+                    PathTraversalRule,
+                    binaryExpr.GetLocation(),
+                    "字符串拼接构造路径时使用了可能包含用户输入的值，存在路径遍历风险"));
+            }
+        }
+    }
+
+    /// <summary>
+    /// 检测插值字符串中的路径遍历风险
+    /// </summary>
+    private void AnalyzePathTraversalInInterpolation(SyntaxNodeAnalysisContext context)
+    {
+        var interpolation = (InterpolatedStringExpressionSyntax)context.Node;
+
+        // 检查插值字符串是否包含路径相关上下文
+        var fullText = interpolation.ToString();
+        if (!fullText.Contains("\\") && !fullText.Contains("/") &&
+            !fullText.Contains("Path") && !fullText.Contains("path"))
+            return;
+
+        // 检查插值表达式中是否包含可疑输入
+        foreach (var content in interpolation.Contents)
+        {
+            if (content is InterpolationSyntax interp &&
+                IsSuspiciousPathArgument(interp.Expression))
+            {
+                context.ReportDiagnostic(Diagnostic.Create(
+                    PathTraversalRule,
+                    interp.GetLocation(),
+                    "字符串插值构造路径时使用了可能包含用户输入的值，存在路径遍历风险"));
+                return;
+            }
+        }
+    }
+
+    /// <summary>
+    /// 获取方法调用名称
+    /// </summary>
+    private string GetMethodName(InvocationExpressionSyntax invocation)
+    {
+        if (invocation.Expression is MemberAccessExpressionSyntax memberAccess)
+        {
+            return memberAccess.Name.Identifier.Text;
+        }
+        else if (invocation.Expression is IdentifierNameSyntax identifier)
+        {
+            return identifier.Identifier.Text;
+        }
+        return null;
+    }
+
+    /// <summary>
+    /// 判断是否是路径相关的方法
+    /// </summary>
+    private bool IsPathRelatedMethod(string methodName)
+    {
+        return methodName.Equals("Combine", StringComparison.OrdinalIgnoreCase) ||
+               methodName.Equals("Join", StringComparison.OrdinalIgnoreCase) ||
+               methodName.Equals("GetFullPath", StringComparison.OrdinalIgnoreCase) ||
+               methodName.Equals("GetTempPath", StringComparison.OrdinalIgnoreCase) ||
+               methodName.Equals("ChangeExtension", StringComparison.OrdinalIgnoreCase) ||
+               methodName.Equals("GetFileName", StringComparison.OrdinalIgnoreCase) ||
+               methodName.Equals("GetDirectoryName", StringComparison.OrdinalIgnoreCase);
+    }
+
+    /// <summary>
+    /// 检查表达式是否包含路径相关变量
+    /// </summary>
+    private bool ContainsPathVariable(ExpressionSyntax expression)
+    {
+        var text = expression.ToString();
+        return text.Contains("Path") ||
+               text.Contains("path") ||
+               text.Contains("dir") ||
+               text.Contains("file") ||
+               text.Contains("\\") ||
+               text.Contains("/");
+    }
+
+    /// <summary>
+    /// 判断参数是否可疑（可能包含用户输入或路径遍历特征）
+    /// </summary>
+    private bool IsSuspiciousPathArgument(ExpressionSyntax expression)
+    {
+        var text = expression.ToString();
+
+        // 检查是否包含路径遍历特征
+        if (text.Contains("..") || text.Contains("~") || text.Contains("%"))
+            return true;
+
+        // 检查是否是用户输入相关变量
+        if (expression is IdentifierNameSyntax identifier)
+        {
+            var varName = identifier.Identifier.Text;
+            if (PathTraversalKeywords.Any(keyword =>
+                varName.IndexOf(keyword, StringComparison.OrdinalIgnoreCase) >= 0))
+            {
+                return true;
+            }
+        }
+
+        // 检查成员访问表达式（如 request.QueryString, user.Input 等）
+        if (expression is MemberAccessExpressionSyntax memberAccess)
+        {
+            var memberText = memberAccess.ToString();
+            if (PathTraversalKeywords.Any(keyword =>
+                memberText.IndexOf(keyword, StringComparison.OrdinalIgnoreCase) >= 0))
+            {
+                return true;
+            }
+        }
+
+        // 检查索引器访问（如 request["file"]）
+        if (expression is ElementAccessExpressionSyntax elementAccess)
+        {
+            return true; // 数组/索引器访问通常来自用户输入
+        }
+
+        // 检查方法调用（如 Console.ReadLine(), stream.Read() 等）
+        if (expression is InvocationExpressionSyntax invocation)
+        {
+            var invocText = invocation.ToString().ToLowerInvariant();
+            if (invocText.Contains("read") || invocText.Contains("input") ||
+                invocText.Contains("get") || invocText.Contains("receive"))
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 }

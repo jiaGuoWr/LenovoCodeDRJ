@@ -9,7 +9,7 @@ using Microsoft.VisualStudio.Threading;
 
 namespace VSIXProject1
 {
-    public class SummaryToolWindow : ToolWindowPane
+    public class SummaryToolWindow : ToolWindowPane, IDisposable
     {
         public SummaryWindowControl Control {
             get { return (SummaryWindowControl)this.Content; }
@@ -25,6 +25,11 @@ namespace VSIXProject1
         public string CurrentBranch { get; private set; }
         public int ChangedFilesCount { get; private set; }
 
+        // 事件订阅状态跟踪
+        private bool _isInstanceInitializedSubscribed = false;
+        private bool _isGitRepositoryChangedSubscribed = false;
+        private bool _isDisposed = false;
+
         public SummaryToolWindow() : base(null)
         {
             this.Caption = "代码问题汇总";
@@ -32,6 +37,7 @@ namespace VSIXProject1
             Control.RefreshRequested += Control_RefreshRequested;
             // 注册 MyToolWindowCommand 实例初始化完成事件
             MyToolWindowCommand.InstanceInitialized += MyToolWindowCommand_InstanceInitialized;
+            _isInstanceInitializedSubscribed = true;
         }
 
         public SummaryToolWindow(AsyncPackage package) : this()
@@ -134,11 +140,13 @@ namespace VSIXProject1
             System.Diagnostics.Debug.WriteLine("MyToolWindowCommand_InstanceInitialized 被调用");
             // 当 MyToolWindowCommand.Instance 初始化完成后，执行代码分析
             ExecuteCodeAnalysis();
-            
+
             // 注册 Git 仓库变化事件
-            if (MyToolWindowCommand.Instance != null)
+            if (MyToolWindowCommand.Instance != null && !_isGitRepositoryChangedSubscribed)
             {
                 MyToolWindowCommand.Instance.GitRepositoryChanged += OnGitRepositoryChanged;
+                _isGitRepositoryChangedSubscribed = true;
+                System.Diagnostics.Debug.WriteLine("SummaryToolWindow: 已订阅 GitRepositoryChanged 事件");
             }
         }
 
@@ -233,6 +241,44 @@ namespace VSIXProject1
             {
                 Control.ClearResults();
             }
+        }
+
+        // 实现 IDisposable 以正确释放资源
+        public void Dispose()
+        {
+            if (_isDisposed)
+                return;
+
+            _isDisposed = true;
+
+            System.Diagnostics.Debug.WriteLine("SummaryToolWindow: Dispose 被调用");
+
+            // 取消订阅 InstanceInitialized 静态事件
+            if (_isInstanceInitializedSubscribed)
+            {
+                MyToolWindowCommand.InstanceInitialized -= MyToolWindowCommand_InstanceInitialized;
+                _isInstanceInitializedSubscribed = false;
+                System.Diagnostics.Debug.WriteLine("SummaryToolWindow: 已取消订阅 InstanceInitialized 事件");
+            }
+
+            // 取消订阅 GitRepositoryChanged 事件
+            if (_isGitRepositoryChangedSubscribed && MyToolWindowCommand.Instance != null)
+            {
+                MyToolWindowCommand.Instance.GitRepositoryChanged -= OnGitRepositoryChanged;
+                _isGitRepositoryChangedSubscribed = false;
+                System.Diagnostics.Debug.WriteLine("SummaryToolWindow: 已取消订阅 GitRepositoryChanged 事件");
+            }
+
+            // 取消订阅 Control 的事件
+            if (Control != null)
+            {
+                Control.RefreshRequested -= Control_RefreshRequested;
+            }
+
+            // 取消订阅 RefreshRequested 事件
+            RefreshRequested -= SummaryToolWindow_RefreshRequested;
+
+            System.Diagnostics.Debug.WriteLine("SummaryToolWindow: Dispose 完成");
         }
     }
 }

@@ -12,6 +12,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Collections.Immutable;
+using System.Collections.Concurrent;
 using Microsoft.VisualStudio;
 using LenovoAnalyzer;
 using System.Runtime.InteropServices;
@@ -142,32 +143,40 @@ namespace VSIXProject1
         private readonly object _debounceLock = new object();
         private const int DEBOUNCE_DELAY_MS = 1000; // 1秒防抖延迟
 
-        // 缓存已分析文件的语法树，避免重复解析
-        private readonly Dictionary<string, (DateTime lastModified, SyntaxTree syntaxTree)> _syntaxTreeCache = new Dictionary<string, (DateTime, SyntaxTree)>();
-        private readonly object _cacheLock = new object();
-        private const int MAX_CACHE_SIZE = 100;
-
         // 最大文件大小限制 (10MB)
         private const long MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024;
 
         // 分析超时时间（秒）
         private const int ANALYSIS_TIMEOUT_SECONDS = 30;
 
-        // 缓存配置
-        private static readonly TimeSpan CACHE_EXPIRATION = TimeSpan.FromMinutes(30);  // 30分钟过期
-        private static readonly TimeSpan CACHE_CLEANUP_INTERVAL = TimeSpan.FromMinutes(5);  // 每5分钟清理
-        private DateTime _lastCacheCleanup = DateTime.MinValue;
-
-        // 缓存条目结构
+        // 缓存条目结构 - 使用不可变设计避免并发修改问题
         private class CacheEntry
         {
-            public DateTime LastModified { get; set; }
-            public DateTime LastAccessed { get; set; }
-            public SyntaxTree SyntaxTree { get; set; }
+            public DateTime LastModified { get; }
+            public DateTime LastAccessed { get; }
+            public SyntaxTree SyntaxTree { get; }
+
+            public CacheEntry(DateTime lastModified, SyntaxTree syntaxTree)
+            {
+                LastModified = lastModified;
+                LastAccessed = DateTime.UtcNow;
+                SyntaxTree = syntaxTree;
+            }
         }
 
-        // 增强的语法树缓存
-        private readonly Dictionary<string, CacheEntry> _syntaxTreeCacheNew = new Dictionary<string, CacheEntry>();
+        // 使用 ConcurrentDictionary 替代 Dictionary + 锁，提高并发性能
+        private readonly ConcurrentDictionary<string, CacheEntry> _syntaxTreeCache = new ConcurrentDictionary<string, CacheEntry>();
+        private const int MAX_CACHE_SIZE = 100;
+
+        // 缓存过期和清理配置
+        private static readonly TimeSpan CACHE_EXPIRATION = TimeSpan.FromMinutes(30);
+        private static readonly TimeSpan CACHE_CLEANUP_INTERVAL = TimeSpan.FromMinutes(5);
+        private DateTime _lastCacheCleanup = DateTime.MinValue;
+        private readonly object _cleanupLock = new object();
+
+        // 分析失败的文件列表 - 用于错误报告
+        private readonly ConcurrentBag<string> _failedAnalysisFiles = new ConcurrentBag<string>();
+        private int _failedAnalysisCount = 0;
 
         // 需要排除的目录
         private static readonly HashSet<string> EXCLUDED_DIRECTORIES = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
@@ -488,7 +497,8 @@ namespace VSIXProject1
                                             });
                                         }
 
-                                        var fileDiagnostics = AnalyzeFileAsync(filesToAnalyze[i], cancellationToken).GetAwaiter().GetResult();
+                                        // 直接调用同步方法，避免在 Parallel.For 中使用 .GetAwaiter().GetResult()
+                                        var fileDiagnostics = AnalyzeFile(filesToAnalyze[i], cancellationToken);
                                         fileDiagnosticsList[i] = fileDiagnostics.ToList();
 
                                         Interlocked.Increment(ref completedFiles);
@@ -629,7 +639,8 @@ namespace VSIXProject1
                                     });
                                 }
 
-                                var fileDiagnostics = AnalyzeFileAsync(csFiles[i], cancellationToken).GetAwaiter().GetResult();
+                                // 直接调用同步方法，避免在 Parallel.For 中使用 .GetAwaiter().GetResult()
+                                var fileDiagnostics = AnalyzeFile(csFiles[i], cancellationToken);
                                 fileDiagnosticsList[i] = fileDiagnostics.ToList();
 
                                 Interlocked.Increment(ref completedFiles);
@@ -695,154 +706,213 @@ namespace VSIXProject1
             () => new LenovoQiraCodeAnalyzerAnalyzer(),
             5);
 
-        private async Task<IEnumerable<Diagnostic>> AnalyzeFileAsync(string filePath, CancellationToken cancellationToken = default)
+        /// <summary>
+        /// 同步分析文件 - 避免在 Parallel.For 中使用 .GetAwaiter().GetResult()
+        /// </summary>
+        private IEnumerable<Diagnostic> AnalyzeFile(string filePath, CancellationToken cancellationToken = default)
         {
             var diagnostics = new List<Diagnostic>();
 
             // 创建超时取消令牌源
-            using var timeoutCts = new CancellationTokenSource(TimeSpan.FromSeconds(ANALYSIS_TIMEOUT_SECONDS));
-            using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeoutCts.Token);
-            var linkedToken = linkedCts.Token;
-
-            try
+            using (var timeoutCts = new CancellationTokenSource(TimeSpan.FromSeconds(ANALYSIS_TIMEOUT_SECONDS)))
+            using (var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeoutCts.Token))
             {
-                // 定期清理缓存
-                CleanupCache();
+                var linkedToken = linkedCts.Token;
 
-                if (!File.Exists(filePath))
+                try
                 {
-                    Debug.WriteLine($"AnalyzeFileAsync: 文件不存在: {filePath}");
-                    return diagnostics;
-                }
+                    // 定期清理缓存
+                    CleanupCache();
 
-                // 检查文件大小，跳过大文件
-                var fileInfo = new FileInfo(filePath);
-                if (fileInfo.Length > MAX_FILE_SIZE_BYTES)
-                {
-                    Debug.WriteLine($"AnalyzeFileAsync: 文件过大，跳过分析: {filePath} ({fileInfo.Length / 1024 / 1024}MB)");
-                    return diagnostics;
-                }
-
-                // 检查是否需要排除的目录
-                if (ShouldExcludeDirectory(filePath))
-                {
-                    return diagnostics;
-                }
-
-                // 检查缓存
-                DateTime currentLastModified = fileInfo.LastWriteTimeUtc;
-                SyntaxTree syntaxTree = null;
-
-                lock (_cacheLock)
-                {
-                    if (_syntaxTreeCacheNew.TryGetValue(filePath, out var cached) && cached.LastModified == currentLastModified)
+                    if (!File.Exists(filePath))
                     {
-                        syntaxTree = cached.SyntaxTree;
-                        cached.LastAccessed = DateTime.UtcNow;  // 更新访问时间
-                        Debug.WriteLine($"AnalyzeFileAsync: 使用缓存的语法树: {filePath}");
+                        Debug.WriteLine($"AnalyzeFile: 文件不存在: {filePath}");
+                        return diagnostics;
                     }
-                }
 
-                // 如果没有缓存，解析文件
-                if (syntaxTree == null)
-                {
-                    linkedToken.ThrowIfCancellationRequested();
+                    // 检查文件大小，跳过大文件
+                    var fileInfo = new FileInfo(filePath);
+                    if (fileInfo.Length > MAX_FILE_SIZE_BYTES)
+                    {
+                        Debug.WriteLine($"AnalyzeFile: 文件过大，跳过分析: {filePath} ({fileInfo.Length / 1024 / 1024}MB)");
+                        return diagnostics;
+                    }
 
-                    string code = await ReadFileTextAsync(filePath);
-                    if (string.IsNullOrWhiteSpace(code))
+                    // 检查是否需要排除的目录
+                    if (ShouldExcludeDirectory(filePath))
                     {
                         return diagnostics;
                     }
 
+                    // 检查缓存 - 使用 ConcurrentDictionary
+                    DateTime currentLastModified = fileInfo.LastWriteTimeUtc;
+                    SyntaxTree syntaxTree = null;
+
+                    if (_syntaxTreeCache.TryGetValue(filePath, out var cached) && cached.LastModified == currentLastModified)
+                    {
+                        syntaxTree = cached.SyntaxTree;
+                        // 使用新的缓存条目更新访问时间（原子操作）
+                        _syntaxTreeCache[filePath] = new CacheEntry(currentLastModified, syntaxTree);
+                        Debug.WriteLine($"AnalyzeFile: 使用缓存的语法树: {filePath}");
+                    }
+
+                    // 如果没有缓存，解析文件
+                    if (syntaxTree == null)
+                    {
+                        linkedToken.ThrowIfCancellationRequested();
+
+                        // 同步读取文件
+                        string code = File.ReadAllText(filePath);
+                        if (string.IsNullOrWhiteSpace(code))
+                        {
+                            return diagnostics;
+                        }
+
+                        linkedToken.ThrowIfCancellationRequested();
+
+                        syntaxTree = CSharpSyntaxTree.ParseText(code, path: filePath, cancellationToken: linkedToken);
+
+                        // 更新缓存 - 使用 ConcurrentDictionary
+                        EnforceCacheSizeLimit();
+                        _syntaxTreeCache[filePath] = new CacheEntry(currentLastModified, syntaxTree);
+                    }
+
                     linkedToken.ThrowIfCancellationRequested();
 
-                    syntaxTree = CSharpSyntaxTree.ParseText(code, path: filePath, cancellationToken: linkedToken);
+                    // 创建编译单元（使用共享引用）
+                    CSharpCompilation compilation = CSharpCompilation.Create(
+                        $"Compilation_{Guid.NewGuid():N}",
+                        syntaxTrees: new[] { syntaxTree },
+                        references: _sharedReferences.Value);
 
-                    // 更新缓存
-                    lock (_cacheLock)
+                    // 从对象池获取分析器
+                    var analyzer = _analyzerPool.Get();
+                    try
                     {
-                        if (_syntaxTreeCacheNew.Count >= MAX_CACHE_SIZE)
-                        {
-                            // 移除最久未访问的条目
-                            var oldest = _syntaxTreeCacheNew.OrderBy(x => x.Value.LastAccessed).First().Key;
-                            _syntaxTreeCacheNew.Remove(oldest);
-                        }
-                        _syntaxTreeCacheNew[filePath] = new CacheEntry
-                        {
-                            LastModified = currentLastModified,
-                            LastAccessed = DateTime.UtcNow,
-                            SyntaxTree = syntaxTree
-                        };
+                        // 使用同步方法获取诊断
+                        var fileDiagnostics = compilation
+                            .WithAnalyzers(ImmutableArray.Create<DiagnosticAnalyzer>(analyzer), cancellationToken: linkedToken)
+                            .GetAnalyzerDiagnosticsAsync(linkedToken)
+                            .ConfigureAwait(false)
+                            .GetAwaiter()
+                            .GetResult();
+                        diagnostics.AddRange(fileDiagnostics);
+                    }
+                    finally
+                    {
+                        _analyzerPool.Return(analyzer);
                     }
                 }
-
-                linkedToken.ThrowIfCancellationRequested();
-
-                // 创建编译单元（使用共享引用）
-                CSharpCompilation compilation = CSharpCompilation.Create(
-                    $"Compilation_{Guid.NewGuid():N}",
-                    syntaxTrees: new[] { syntaxTree },
-                    references: _sharedReferences.Value);
-
-                // 从对象池获取分析器
-                var analyzer = _analyzerPool.Get();
-                try
+                catch (OperationCanceledException) when (timeoutCts.IsCancellationRequested)
                 {
-                    var fileDiagnostics = await compilation
-                        .WithAnalyzers(ImmutableArray.Create<DiagnosticAnalyzer>(analyzer), cancellationToken: linkedToken)
-                        .GetAnalyzerDiagnosticsAsync(linkedToken);
-                    diagnostics.AddRange(fileDiagnostics);
+                    Debug.WriteLine($"分析文件超时: {filePath}");
+                    // 记录失败但不抛出，返回已收集的诊断
+                    RecordAnalysisFailure(filePath, "分析超时");
                 }
-                finally
+                catch (OperationCanceledException)
                 {
-                    _analyzerPool.Return(analyzer);
+                    Debug.WriteLine($"分析被取消: {filePath}");
+                    throw;
                 }
-            }
-            catch (OperationCanceledException) when (timeoutCts.IsCancellationRequested)
-            {
-                Debug.WriteLine($"分析文件超时: {filePath}");
-                // 返回已收集的诊断（可能为空）
-            }
-            catch (OperationCanceledException)
-            {
-                Debug.WriteLine($"分析被取消: {filePath}");
-                throw;
-            }
-            catch (Exception ex)
-            {
-                Debug.WriteLine($"分析文件时出错: {ex.Message}");
-            }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine($"分析文件时出错: {ex.Message}");
+                    // 记录分析失败，供错误报告使用
+                    RecordAnalysisFailure(filePath, ex.Message);
+                }
 
-            return diagnostics;
+                return diagnostics;
+            }
         }
 
         /// <summary>
-        /// 清理过期缓存条目
+        /// 记录分析失败的文件
+        /// </summary>
+        private void RecordAnalysisFailure(string filePath, string errorMessage)
+        {
+            _failedAnalysisFiles.Add($"{filePath}: {errorMessage}");
+            Interlocked.Increment(ref _failedAnalysisCount);
+            Debug.WriteLine($"记录分析失败: {filePath} - {errorMessage}");
+        }
+
+        /// <summary>
+        /// 获取并清空分析失败的文件列表
+        /// </summary>
+        public IEnumerable<string> GetAndClearFailedAnalysisFiles()
+        {
+            var failedFiles = _failedAnalysisFiles.ToArray();
+            // ConcurrentBag 没有 Clear 方法，使用 TryTake 循环清空
+            while (_failedAnalysisFiles.TryTake(out _)) { }
+            Interlocked.Exchange(ref _failedAnalysisCount, 0);
+            return failedFiles;
+        }
+
+        /// <summary>
+        /// 获取分析失败计数
+        /// </summary>
+        public int GetFailedAnalysisCount()
+        {
+            return _failedAnalysisCount;
+        }
+
+        /// <summary>
+        /// 强制执行缓存大小限制
+        /// </summary>
+        private void EnforceCacheSizeLimit()
+        {
+            // 如果缓存大小超过限制，移除最久未访问的条目
+            while (_syntaxTreeCache.Count >= MAX_CACHE_SIZE)
+            {
+                var oldestKey = _syntaxTreeCache.OrderBy(x => x.Value.LastAccessed).FirstOrDefault().Key;
+                if (oldestKey != null)
+                {
+                    _syntaxTreeCache.TryRemove(oldestKey, out _);
+                }
+                else
+                {
+                    break;
+                }
+            }
+        }
+
+        /// <summary>
+        /// 异步分析文件 - 供外部调用
+        /// </summary>
+        private async Task<IEnumerable<Diagnostic>> AnalyzeFileAsync(string filePath, CancellationToken cancellationToken = default)
+        {
+            return await Task.Run(() => AnalyzeFile(filePath, cancellationToken), cancellationToken);
+        }
+
+        /// <summary>
+        /// 清理过期缓存条目 - 使用 ConcurrentDictionary 无需额外锁
         /// </summary>
         private void CleanupCache()
         {
-            lock (_cacheLock)
-            {
-                var now = DateTime.UtcNow;
+            var now = DateTime.UtcNow;
 
-                // 检查是否需要清理
+            // 检查是否需要清理 - 使用独立锁保护最后清理时间
+            lock (_cleanupLock)
+            {
                 if (now - _lastCacheCleanup < CACHE_CLEANUP_INTERVAL)
                     return;
 
                 _lastCacheCleanup = now;
+            }
 
-                // 移除过期条目
-                var expiredKeys = _syntaxTreeCacheNew
-                    .Where(kvp => now - kvp.Value.LastAccessed > CACHE_EXPIRATION)
-                    .Select(kvp => kvp.Key)
-                    .ToList();
+            // 移除过期条目 - ConcurrentDictionary 支持并发遍历
+            var expiredKeys = _syntaxTreeCache
+                .Where(kvp => now - kvp.Value.LastAccessed > CACHE_EXPIRATION)
+                .Select(kvp => kvp.Key)
+                .ToList();
 
-                foreach (var key in expiredKeys)
-                {
-                    _syntaxTreeCacheNew.Remove(key);
-                }
+            foreach (var key in expiredKeys)
+            {
+                _syntaxTreeCache.TryRemove(key, out _);
+            }
 
-                Debug.WriteLine($"缓存清理完成: 移除了 {expiredKeys.Count} 个过期条目，当前缓存 {_syntaxTreeCacheNew.Count} 项");
+            if (expiredKeys.Count > 0)
+            {
+                Debug.WriteLine($"缓存清理完成: 移除了 {expiredKeys.Count} 个过期条目，当前缓存 {_syntaxTreeCache.Count} 项");
             }
         }
 

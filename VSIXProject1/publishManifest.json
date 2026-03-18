@@ -1,0 +1,13 @@
+{
+  "$schema": "http://json.schemastore.org/vsix-publish",
+  "categories": [ "Other" ],
+  "identity": {
+    "internalName": "LenovoQiraDRJ"
+  },
+  "overview": "overview.md",
+  "priceCategory": "free",
+  "publisher": "Lenovo-Direnjie",
+  "private": false,
+  "qna": true,
+  "repo": ""
+}

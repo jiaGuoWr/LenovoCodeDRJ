@@ -1,0 +1,36 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<CommandTable
+    xmlns="http://schemas.microsoft.com/VisualStudio/2005-10-18/CommandTable"
+    xmlns:xs="http://www.w3.org/2001/XMLSchema">
+
+	<Extern href="stdidcmd.h"/>
+	<Extern href="vsshlids.h"/>
+
+	<Symbols>
+		<GuidSymbol name="guidVSIXProject1Package" value="{89D89890-7000-4008-8000-000000000001}"/>
+		<GuidSymbol name="guidSummaryCommandSet" value="{89D89890-7000-4008-8000-000000000001}">
+			<IDSymbol name="MyToolMenuGroup" value="0x1020"/>
+			<IDSymbol name="SummaryCommandId" value="0x0100"/>
+		</GuidSymbol>
+	</Symbols>
+
+	<Commands package="guidVSIXProject1Package">
+		<Groups>
+			<Group guid="guidSummaryCommandSet" id="MyToolMenuGroup" priority="0x0600">
+				<Parent guid="guidSHLMainMenu" id="IDM_VS_MENU_TOOLS"/>
+			</Group>
+		</Groups>
+
+		<Buttons>
+			<Button guid="guidSummaryCommandSet" id="SummaryCommandId" priority="0x0100" type="Button">
+				<Parent guid="guidSummaryCommandSet" id="MyToolMenuGroup"/>
+				
+				<Strings>
+					<ButtonText>代码问题汇总</ButtonText>
+					<CommandName>代码问题汇总</CommandName>
+				</Strings>
+			</Button>
+		</Buttons>
+	</Commands>
+
+</CommandTable>

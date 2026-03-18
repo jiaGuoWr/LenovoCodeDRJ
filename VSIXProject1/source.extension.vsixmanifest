@@ -1,0 +1,40 @@
+<?xml version="1.0" ?>
+<PackageManifest Version="2.0.0" xmlns="http://schemas.microsoft.com/developer/vsx-schema/2011" xmlns:d="http://schemas.microsoft.com/developer/vsx-schema-design/2011">
+    <Metadata>
+        <Identity Id="VSIXProject1.e89340e7-2602-4d3e-ae56-e08ca0ca54f8" Version="2.0" Language="en-US" Publisher="Lenovo Direnjie" />
+        <DisplayName>Lenovo Direnjie</DisplayName>
+        <Description xml:space="preserve">Lenovo A Visual Studio extension that provides Git integration and code analysis capabilities.</Description>
+        <License>LICENSE.txt</License>
+        <GettingStartedGuide>GettingStarted.md</GettingStartedGuide>
+        <ReleaseNotes>ReleaseNotes.md</ReleaseNotes>
+        <Icon>Resources\preview.png</Icon>
+        <PreviewImage>Resources\preview.png</PreviewImage>
+        <Tags>Git,Analyzer,Lenovo</Tags>
+        <Preview>true</Preview>
+    </Metadata>
+    <Installation>
+        <InstallationTarget Id="Microsoft.VisualStudio.Community" Version="[17.0, 18.0)">
+            <ProductArchitecture>amd64</ProductArchitecture>
+        </InstallationTarget>
+        <InstallationTarget Id="Microsoft.VisualStudio.Pro" Version="[17.0, 18.0)">
+            <ProductArchitecture>amd64</ProductArchitecture>
+        </InstallationTarget>
+        <InstallationTarget Id="Microsoft.VisualStudio.Enterprise" Version="[17.0, 18.0)">
+            <ProductArchitecture>amd64</ProductArchitecture>
+        </InstallationTarget>
+    </Installation>
+    <Dependencies>
+        <Dependency Id="Microsoft.Framework.NDP" DisplayName="Microsoft .NET Framework" d:Source="Manual" Version="[4.5,)" />
+    </Dependencies>
+    <Prerequisites>
+        <Prerequisite Id="Microsoft.VisualStudio.Component.CoreEditor" Version="[17.0,18.0)" DisplayName="Visual Studio core editor" />
+    </Prerequisites>
+    <Assets>
+        <Asset Type="Microsoft.VisualStudio.VsPackage" d:Source="Project" d:ProjectName="%CurrentProject%" Path="|%CurrentProject%;PkgdefProjectOutputGroup|" />
+
+        <Asset Type="Microsoft.VisualStudio.MefComponent" d:Source="Project" d:ProjectName="LenovoAnalyzer" Path="|LenovoAnalyzer|"/>
+        <Asset Type="Microsoft.VisualStudio.Analyzer" d:Source="Project" d:ProjectName="LenovoAnalyzer" Path="|LenovoAnalyzer|"/>
+        <Asset Type="Microsoft.VisualStudio.MefComponent" d:Source="Project" d:ProjectName="LenovoAnalyzer.CodeFixes" Path="|LenovoAnalyzer.CodeFixes|"/>
+        <Asset Type="Microsoft.VisualStudio.Analyzer" d:Source="Project" d:ProjectName="LenovoAnalyzer.CodeFixes" Path="|LenovoAnalyzer.CodeFixes|"/>
+    </Assets>
+</PackageManifest>

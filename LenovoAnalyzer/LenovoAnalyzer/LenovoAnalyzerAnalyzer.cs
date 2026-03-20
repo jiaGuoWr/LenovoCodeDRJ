@@ -84,17 +84,110 @@ public class LenovoQiraCodeAnalyzerAnalyzer : DiagnosticAnalyzer
         isEnabledByDefault: true,
         description: "永远不要直接使用用户输入作为路径，可能导致路径遍历攻击。应验证路径是否在允许的目录内");
 
+    public const string SqlInjectionId = "SEC003";
+    private static readonly DiagnosticDescriptor SqlInjectionRule = new DiagnosticDescriptor(
+        SqlInjectionId,
+        "潜在的SQL注入风险",
+        "检测到通过{0}动态构建SQL语句，存在SQL注入风险: {1}",
+        "Security",
+        DiagnosticSeverity.Warning,
+        isEnabledByDefault: true,
+        description: "不应使用字符串拼接或插值动态构建SQL语句，建议使用参数化查询或ORM框架");
+
+    public const string UnsafeDeserializationId = "SEC004";
+    private static readonly DiagnosticDescriptor UnsafeDeserializationRule = new DiagnosticDescriptor(
+        UnsafeDeserializationId,
+        "使用了不安全的反序列化方式",
+        "检测到不安全的反序列化操作: {0}，可能导致远程代码执行（RCE）漏洞",
+        "Security",
+        DiagnosticSeverity.Warning,
+        isEnabledByDefault: true,
+        description: "BinaryFormatter和JavaScriptSerializer存在反序列化漏洞，建议使用System.Text.Json，若使用Newtonsoft.Json须设置TypeNameHandling.None");
+
+    public const string InsecureRandomId = "SEC005";
+    private static readonly DiagnosticDescriptor InsecureRandomRule = new DiagnosticDescriptor(
+        InsecureRandomId,
+        "使用了密码学不安全的随机数生成器",
+        "检测到使用 System.Random {0}，不适用于安全场景（如令牌、密钥生成），建议改用 RandomNumberGenerator",
+        "Security",
+        DiagnosticSeverity.Warning,
+        isEnabledByDefault: true,
+        description: "System.Random使用伪随机算法，不具备密码学安全性，在生成令牌、密钥、验证码等安全敏感场景下必须使用RandomNumberGenerator");
+
+    public const string RegexDosId = "SEC006";
+    private static readonly DiagnosticDescriptor RegexDosRule = new DiagnosticDescriptor(
+        RegexDosId,
+        "正则表达式缺少超时参数（ReDoS风险）",
+        "检测到 {0} 未设置超时参数，复杂正则表达式可能导致正则表达式拒绝服务（ReDoS）攻击",
+        "Security",
+        DiagnosticSeverity.Warning,
+        isEnabledByDefault: true,
+        description: "使用Regex时应始终指定matchTimeout参数，防止恶意输入导致回溯爆炸式增长造成DoS攻击");
+
+    public const string ResourceLeakId = "SEC007";
+    private static readonly DiagnosticDescriptor ResourceLeakRule = new DiagnosticDescriptor(
+        ResourceLeakId,
+        "IDisposable资源未使用using语句管理（资源泄漏风险）",
+        "'{0}' 实现了IDisposable接口，创建后应使用using语句或using声明确保资源被释放",
+        "Security",
+        DiagnosticSeverity.Warning,
+        isEnabledByDefault: true,
+        description: "数据库连接、文件流、HttpClient等资源未正确释放会导致连接池耗尽、文件句柄泄漏等问题");
+
+    public const string InsecureTempFileId = "SEC008";
+    private static readonly DiagnosticDescriptor InsecureTempFileRule = new DiagnosticDescriptor(
+        InsecureTempFileId,
+        "使用了可预测的临时文件名（竞争条件/文件枚举风险）",
+        "检测到使用可预测方式({0})构造临时文件名，攻击者可预测文件路径发动竞争条件或符号链接攻击",
+        "Security",
+        DiagnosticSeverity.Warning,
+        isEnabledByDefault: true,
+        description: "应使用Path.GetTempFileName()或Path.Combine(Path.GetTempPath(), Path.GetRandomFileName())生成不可预测的临时文件名");
+
     public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics
-        => ImmutableArray.Create(Rule, MissingDllImportSearchPathsRule, InvalidStackTraceUsageRule, UnsafeDllSignatureRule,
-            InvalidCommentedCodeRule,
-            SensitiveInfoInCodeRule,
-            PathTraversalRule);
+        => ImmutableArray.Create(
+            Rule, MissingDllImportSearchPathsRule, InvalidStackTraceUsageRule,
+            UnsafeDllSignatureRule, InvalidCommentedCodeRule, SensitiveInfoInCodeRule,
+            PathTraversalRule,
+            SqlInjectionRule,
+            UnsafeDeserializationRule,
+            InsecureRandomRule,
+            RegexDosRule,
+            ResourceLeakRule,
+            InsecureTempFileRule);
 
     private static readonly HashSet<string> SensitiveKeywords = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
     {
         "password", "pwd", "token", "secret", "key", "apikey",
         "accesskey", "privatekey", "secretkey", "credential",
          "auth", "authorization", "passcode", "certificate", "secretid"
+    };
+
+    private static readonly HashSet<string> SqlKeywords = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+    {
+        "SELECT", "INSERT", "UPDATE", "DELETE", "DROP", "CREATE",
+        "ALTER", "FROM", "WHERE", "JOIN", "UNION", "EXEC", "EXECUTE"
+    };
+
+    private static readonly HashSet<string> UnsafeSerializerTypes = new HashSet<string>(StringComparer.Ordinal)
+    {
+        "BinaryFormatter", "JavaScriptSerializer", "LosFormatter",
+        "NetDataContractSerializer", "SoapFormatter"
+    };
+
+    private static readonly HashSet<string> UnsafeTypeNameHandlingValues = new HashSet<string>(StringComparer.Ordinal)
+    {
+        "All", "Objects", "Arrays", "Auto"
+    };
+
+    private static readonly HashSet<string> InsecureRandomMethods = new HashSet<string>(StringComparer.Ordinal)
+    {
+        "Next", "NextBytes", "NextDouble"
+    };
+
+    private static readonly HashSet<string> RegexStaticMethods = new HashSet<string>(StringComparer.Ordinal)
+    {
+        "IsMatch", "Match", "Matches", "Replace", "Split"
     };
 
 
@@ -117,6 +210,29 @@ public class LenovoQiraCodeAnalyzerAnalyzer : DiagnosticAnalyzer
         context.RegisterSyntaxNodeAction(AnalyzePathTraversal, SyntaxKind.InvocationExpression);
         context.RegisterSyntaxNodeAction(AnalyzePathTraversalInBinaryExpression, SyntaxKind.AddExpression);
         context.RegisterSyntaxNodeAction(AnalyzePathTraversalInInterpolation, SyntaxKind.InterpolatedStringExpression);
+
+        // SEC003: SQL注入
+        context.RegisterSyntaxNodeAction(AnalyzeSqlInjection, SyntaxKind.ObjectCreationExpression);
+        context.RegisterSyntaxNodeAction(AnalyzeSqlCommandTextAssignment, SyntaxKind.SimpleAssignmentExpression);
+        context.RegisterSyntaxNodeAction(AnalyzeSqlQueryMethods, SyntaxKind.InvocationExpression);
+
+        // SEC004: 不安全反序列化
+        context.RegisterSyntaxNodeAction(AnalyzeUnsafeDeserialization, SyntaxKind.ObjectCreationExpression);
+        context.RegisterSyntaxNodeAction(AnalyzeTypeNameHandlingAssignment, SyntaxKind.SimpleAssignmentExpression);
+
+        // SEC005: 不安全随机数
+        context.RegisterSyntaxNodeAction(AnalyzeInsecureRandom, SyntaxKind.ObjectCreationExpression);
+        context.RegisterSyntaxNodeAction(AnalyzeInsecureRandomMethodCall, SyntaxKind.InvocationExpression);
+
+        // SEC006: ReDoS
+        context.RegisterSyntaxNodeAction(AnalyzeRegexWithoutTimeout, SyntaxKind.ObjectCreationExpression);
+        context.RegisterSyntaxNodeAction(AnalyzeStaticRegexWithoutTimeout, SyntaxKind.InvocationExpression);
+
+        // SEC007: 资源泄漏
+        context.RegisterSyntaxNodeAction(AnalyzeResourceLeak, SyntaxKind.LocalDeclarationStatement);
+
+        // SEC008: 不安全临时文件
+        context.RegisterSyntaxNodeAction(AnalyzeInsecureTempFile, SyntaxKind.InvocationExpression);
     }
 
     private void AnalyzeSyntaxTreeForChineseComments(SyntaxTreeAnalysisContext context)
@@ -919,5 +1035,619 @@ public class LenovoQiraCodeAnalyzerAnalyzer : DiagnosticAnalyzer
         }
 
         return false;
+    }
+
+    // ═════════════════════════════════════════════════════════════════
+    // SEC003 ~ SEC008 新增安全规则实现
+    // ═════════════════════════════════════════════════════════════════
+
+    // 已知SQL命令类型名（仅后缀匹配，避免命名空间污染误判）
+    private static readonly HashSet<string> SqlCommandTypeNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+    {
+        "SqlCommand", "DbCommand", "SqliteCommand", "MySqlCommand",
+        "NpgsqlCommand", "OracleCommand", "OleDbCommand", "OdbcCommand"
+    };
+
+    // 已知需要 using 管理的 IDisposable 类型
+    private static readonly HashSet<string> DisposableTypeNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+    {
+        "SqlConnection", "SqlCommand", "SqlDataReader", "SqlTransaction",
+        "DbConnection", "DbCommand", "DbDataReader", "DbTransaction",
+        "SqliteConnection", "SqliteCommand",
+        "MySqlConnection", "MySqlCommand",
+        "NpgsqlConnection", "NpgsqlCommand",
+        "FileStream", "StreamReader", "StreamWriter", "BinaryReader", "BinaryWriter",
+        "MemoryStream", "BufferedStream", "GZipStream", "DeflateStream",
+        "HttpClient", "HttpClientHandler", "HttpMessageHandler",
+        "TcpClient", "UdpClient", "NetworkStream", "Socket",
+        "DbContext",
+        "SqlBulkCopy",
+        "CancellationTokenSource",
+        "SemaphoreSlim", "Mutex", "Semaphore"
+    };
+
+    /// <summary>
+    /// 从类型语法中提取最后一个简单名称（处理带命名空间的全限定名）
+    /// </summary>
+    private string GetSimpleTypeName(TypeSyntax type)
+    {
+        if (type is IdentifierNameSyntax idName)
+            return idName.Identifier.Text;
+        if (type is QualifiedNameSyntax qualName)
+            return qualName.Right.Identifier.Text;
+        if (type is GenericNameSyntax genName)
+            return genName.Identifier.Text;
+        return type.ToString().Split('.').Last();
+    }
+
+    /// <summary>
+    /// 判断表达式是否为字符串拼接或插值，返回构建方式描述，否则返回null
+    /// </summary>
+    private string GetStringBuildMethod(ExpressionSyntax expression)
+    {
+        // 字符串插值: $"SELECT {id}"
+        if (expression is InterpolatedStringExpressionSyntax)
+            return "字符串插值($\"\")";
+
+        // 字符串拼接: "SELECT " + userInput
+        if (expression is BinaryExpressionSyntax binary &&
+            binary.OperatorToken.IsKind(SyntaxKind.PlusToken))
+        {
+            // 至少一侧是字符串字面量，另一侧是变量/调用（减少误报：两侧都是字面量则忽略）
+            bool leftIsLiteral = binary.Left is LiteralExpressionSyntax le1 && le1.IsKind(SyntaxKind.StringLiteralExpression);
+            bool rightIsLiteral = binary.Right is LiteralExpressionSyntax le2 && le2.IsKind(SyntaxKind.StringLiteralExpression);
+            if (leftIsLiteral && rightIsLiteral)
+                return null; // 两侧都是字面量，是安全的常量拼接
+            if (leftIsLiteral || rightIsLiteral)
+                return "字符串拼接(+)";
+        }
+
+        return null;
+    }
+
+    // ═════════════════════════════════════════════════════════════════
+    // SEC003: SQL注入防护
+    // ═════════════════════════════════════════════════════════════════
+
+    /// <summary>
+    /// SEC003: 检测SQL命令构造函数中直接使用字符串插值或拼接
+    /// </summary>
+    private void AnalyzeSqlInjection(SyntaxNodeAnalysisContext context)
+    {
+        var objectCreation = (ObjectCreationExpressionSyntax)context.Node;
+
+        // 提取类型名（处理 new SqlCommand / new System.Data.SqlClient.SqlCommand 两种形式）
+        string typeName = GetSimpleTypeName(objectCreation.Type);
+        if (!SqlCommandTypeNames.Contains(typeName))
+            return;
+
+        // 检查构造函数参数列表，第一个参数是命令文本
+        if (objectCreation.ArgumentList == null || objectCreation.ArgumentList.Arguments.Count == 0)
+            return;
+
+        var firstArg = objectCreation.ArgumentList.Arguments[0].Expression;
+        string buildMethod = GetStringBuildMethod(firstArg);
+        if (buildMethod == null)
+            return;
+
+        context.ReportDiagnostic(Diagnostic.Create(
+            SqlInjectionRule,
+            firstArg.GetLocation(),
+            typeName,
+            buildMethod));
+    }
+
+    /// <summary>
+    /// SEC003: 检测 cmd.CommandText = $"..." 或 cmd.CommandText = "..." + var 的赋值
+    /// </summary>
+    private void AnalyzeSqlCommandTextAssignment(SyntaxNodeAnalysisContext context)
+    {
+        var assignment = (AssignmentExpressionSyntax)context.Node;
+
+        // 左侧必须是 xxx.CommandText 的成员访问
+        if (!(assignment.Left is MemberAccessExpressionSyntax memberAccess))
+            return;
+        if (!memberAccess.Name.Identifier.Text.Equals("CommandText", StringComparison.Ordinal))
+            return;
+
+        string buildMethod = GetStringBuildMethod(assignment.Right);
+        if (buildMethod == null)
+            return;
+
+        context.ReportDiagnostic(Diagnostic.Create(
+            SqlInjectionRule,
+            assignment.Right.GetLocation(),
+            "CommandText",
+            buildMethod));
+    }
+
+    /// <summary>
+    /// SEC003: 检测 EntityFramework 或 Dapper 等ORM的FromSqlRaw/ExecuteSqlRaw等危险方法
+    /// </summary>
+    private void AnalyzeSqlQueryMethods(SyntaxNodeAnalysisContext context)
+    {
+        var invocation = (InvocationExpressionSyntax)context.Node;
+
+        string methodName = GetMethodName(invocation);
+        if (string.IsNullOrEmpty(methodName))
+            return;
+
+        // 检测各种危险的SQL执行方法
+        var dangerousMethods = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            "FromSqlRaw", "FromSqlInterpolated",
+            "ExecuteSqlRaw", "ExecuteSqlRawAsync",
+            "ExecuteSqlCommand", "ExecuteSqlCommandAsync",
+            "SqlQuery", "SqlQueryAsync",
+            "Query", "QueryAsync", "Execute", "ExecuteAsync"
+        };
+
+        if (!dangerousMethods.Contains(methodName))
+            return;
+
+        // 检查参数是否是字符串插值或拼接
+        if (invocation.ArgumentList == null || invocation.ArgumentList.Arguments.Count == 0)
+            return;
+
+        var firstArg = invocation.ArgumentList.Arguments[0].Expression;
+        string buildMethod = GetStringBuildMethod(firstArg);
+        if (buildMethod == null)
+            return;
+
+        context.ReportDiagnostic(Diagnostic.Create(
+            SqlInjectionRule,
+            firstArg.GetLocation(),
+            methodName,
+            buildMethod));
+    }
+
+    // ═════════════════════════════════════════════════════════════════
+    // SEC004: 不安全的反序列化
+    // ═════════════════════════════════════════════════════════════════
+
+    /// <summary>
+    /// SEC004: 检测 new BinaryFormatter() 等不安全序列化器
+    /// </summary>
+    private void AnalyzeUnsafeDeserialization(SyntaxNodeAnalysisContext context)
+    {
+        var objectCreation = (ObjectCreationExpressionSyntax)context.Node;
+        string typeName = GetSimpleTypeName(objectCreation.Type);
+
+        if (UnsafeSerializerTypes.Contains(typeName))
+        {
+            context.ReportDiagnostic(Diagnostic.Create(
+                UnsafeDeserializationRule,
+                objectCreation.GetLocation(),
+                $"new {typeName}() — 该类型存在已知RCE漏洞"));
+        }
+    }
+
+    /// <summary>
+    /// SEC004: 检测 settings.TypeNameHandling = TypeNameHandling.All/Objects/Arrays/Auto
+    /// </summary>
+    private void AnalyzeTypeNameHandlingAssignment(SyntaxNodeAnalysisContext context)
+    {
+        var assignment = (AssignmentExpressionSyntax)context.Node;
+
+        // 左侧必须是 xxx.TypeNameHandling 形式
+        if (!(assignment.Left is MemberAccessExpressionSyntax memberAccess))
+            return;
+        if (!memberAccess.Name.Identifier.Text.Equals("TypeNameHandling", StringComparison.Ordinal))
+            return;
+
+        // 右值：检查是否是 TypeNameHandling.None（安全），其他值都不安全
+        var rightText = assignment.Right.ToString().Trim();
+
+        // 安全值：TypeNameHandling.None 或 0（整数0等价于None）
+        if (rightText.EndsWith(".None", StringComparison.Ordinal) ||
+            rightText.Equals("0", StringComparison.Ordinal) ||
+            rightText.Equals("TypeNameHandling.None", StringComparison.Ordinal))
+            return;
+
+        // 检查是否是不安全的值
+        foreach (var unsafeValue in UnsafeTypeNameHandlingValues)
+        {
+            if (rightText.EndsWith($".{unsafeValue}", StringComparison.Ordinal) ||
+                rightText.Equals(unsafeValue, StringComparison.Ordinal))
+            {
+                context.ReportDiagnostic(Diagnostic.Create(
+                    UnsafeDeserializationRule,
+                    assignment.GetLocation(),
+                    $"TypeNameHandling = {rightText}（仅TypeNameHandling.None是安全的）"));
+                return;
+            }
+        }
+
+        // 如果是其他值（可能是变量），也报告
+        if (!rightText.Contains("None"))
+        {
+            context.ReportDiagnostic(Diagnostic.Create(
+                UnsafeDeserializationRule,
+                assignment.GetLocation(),
+                $"TypeNameHandling = {rightText}（建议显式设置为TypeNameHandling.None）"));
+        }
+    }
+
+    // ═════════════════════════════════════════════════════════════════
+    // SEC005: 不安全的随机数生成
+    // ═════════════════════════════════════════════════════════════════
+
+    /// <summary>
+    /// SEC005: 检测 new Random() 的创建
+    /// </summary>
+    private void AnalyzeInsecureRandom(SyntaxNodeAnalysisContext context)
+    {
+        var objectCreation = (ObjectCreationExpressionSyntax)context.Node;
+        string typeName = GetSimpleTypeName(objectCreation.Type);
+
+        // 精确匹配 "Random"，不匹配 SecureRandom/CryptoRandom 等
+        if (!typeName.Equals("Random", StringComparison.Ordinal))
+            return;
+
+        // 排除全限定名不是 System.Random 的情况（如第三方库的 Random）
+        // 在纯语法分析下，我们通过检查是否有 "Crypto"/"Secure"/"Strong" 前缀排除已知安全替代品
+        var fullText = objectCreation.Type.ToString();
+        if (fullText.IndexOf("Crypto", StringComparison.OrdinalIgnoreCase) >= 0 ||
+            fullText.IndexOf("Secure", StringComparison.OrdinalIgnoreCase) >= 0 ||
+            fullText.IndexOf("Strong", StringComparison.OrdinalIgnoreCase) >= 0)
+            return;
+
+        context.ReportDiagnostic(Diagnostic.Create(
+            InsecureRandomRule,
+            objectCreation.GetLocation(),
+            "构造"));
+    }
+
+    /// <summary>
+    /// SEC005: 检测 Random.Next/NextBytes/NextDouble 方法调用
+    /// </summary>
+    private void AnalyzeInsecureRandomMethodCall(SyntaxNodeAnalysisContext context)
+    {
+        var invocation = (InvocationExpressionSyntax)context.Node;
+
+        if (!(invocation.Expression is MemberAccessExpressionSyntax memberAccess))
+            return;
+
+        string methodName = memberAccess.Name.Identifier.Text;
+        if (!InsecureRandomMethods.Contains(methodName))
+            return;
+
+        // 检查调用者是否是 Random 类型
+        var callerText = memberAccess.Expression.ToString();
+        if (callerText.EndsWith("Random", StringComparison.Ordinal) &&
+            !callerText.Contains("Crypto") &&
+            !callerText.Contains("Secure") &&
+            !callerText.Contains("Security"))
+        {
+            context.ReportDiagnostic(Diagnostic.Create(
+                InsecureRandomRule,
+                invocation.GetLocation(),
+                $"方法调用 .{methodName}()"));
+        }
+    }
+
+    // ═════════════════════════════════════════════════════════════════
+    // SEC006: ReDoS（正则表达式拒绝服务）
+    // ═════════════════════════════════════════════════════════════════
+
+    /// <summary>
+    /// SEC006: 检测 new Regex(pattern) 或 new Regex(pattern, options) 未传入超时参数
+    /// Regex构造函数签名:
+    ///   Regex(string pattern)
+    ///   Regex(string pattern, RegexOptions options)
+    ///   Regex(string pattern, RegexOptions options, TimeSpan matchTimeout)  ← 安全
+    /// </summary>
+    private void AnalyzeRegexWithoutTimeout(SyntaxNodeAnalysisContext context)
+    {
+        var objectCreation = (ObjectCreationExpressionSyntax)context.Node;
+        string typeName = GetSimpleTypeName(objectCreation.Type);
+
+        if (!typeName.Equals("Regex", StringComparison.Ordinal))
+            return;
+
+        // 参数少于3个则缺少 matchTimeout
+        int argCount = objectCreation.ArgumentList?.Arguments.Count ?? 0;
+        if (argCount >= 3)
+            return; // 传入了超时参数，安全
+
+        // 必须至少有1个参数（pattern），空参数列表不是Regex的有效用法
+        if (argCount == 0)
+            return;
+
+        context.ReportDiagnostic(Diagnostic.Create(
+            RegexDosRule,
+            objectCreation.GetLocation(),
+            "new Regex(...)"));
+    }
+
+    /// <summary>
+    /// SEC006: 检测 Regex.IsMatch/Match/Replace 等静态方法未设置超时参数
+    /// </summary>
+    private void AnalyzeStaticRegexWithoutTimeout(SyntaxNodeAnalysisContext context)
+    {
+        var invocation = (InvocationExpressionSyntax)context.Node;
+
+        if (!(invocation.Expression is MemberAccessExpressionSyntax memberAccess))
+            return;
+
+        // 检查是否是 Regex.XXX 调用
+        var callerText = memberAccess.Expression.ToString();
+        if (!callerText.Equals("Regex", StringComparison.Ordinal))
+            return;
+
+        string methodName = memberAccess.Name.Identifier.Text;
+        if (!RegexStaticMethods.Contains(methodName))
+            return;
+
+        // 检查是否传入了 timeout 参数（最后一个参数是 TimeSpan 类型）
+        if (invocation.ArgumentList == null)
+            return;
+
+        var args = invocation.ArgumentList.Arguments;
+
+        // 检查最后一个参数是否是 TimeSpan 相关
+        if (args.Count > 0)
+        {
+            var lastArg = args[args.Count - 1].Expression.ToString();
+            if (lastArg.Contains("TimeSpan") ||
+                lastArg.Contains("FromSeconds") ||
+                lastArg.Contains("FromMilliseconds"))
+                return; // 已设置超时
+        }
+
+        // Regex静态方法通常有带timeout参数的重载
+        // 如果参数数量少于带timeout版本，则认为缺少超时参数
+        // Regex.IsMatch(input, pattern) - 2参数，无超时
+        // Regex.IsMatch(input, pattern, options, matchTimeout) - 4参数，有超时
+        bool hasTimeoutOverload = methodName switch
+        {
+            "IsMatch" => args.Count >= 4,
+            "Match" => args.Count >= 4,
+            "Matches" => args.Count >= 4,
+            "Replace" => args.Count >= 5 || (args.Count >= 4 && args[3].Expression.ToString().Contains("TimeSpan")),
+            "Split" => args.Count >= 4,
+            _ => false
+        };
+
+        if (!hasTimeoutOverload)
+        {
+            context.ReportDiagnostic(Diagnostic.Create(
+                RegexDosRule,
+                invocation.GetLocation(),
+                $"Regex.{methodName}(...)"));
+        }
+    }
+
+    // ═════════════════════════════════════════════════════════════════
+    // SEC007: 资源泄漏
+    // ═════════════════════════════════════════════════════════════════
+
+    /// <summary>
+    /// 检查 LocalDeclarationStatementSyntax 是否带有 using 修饰符（C# 8.0 using declaration）
+    /// </summary>
+    private bool HasUsingModifier(LocalDeclarationStatementSyntax localDecl)
+    {
+        var nodeText = localDecl.ToString().TrimStart();
+        return nodeText.StartsWith("using ", StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// 检查节点是否在传统 using(){} 语句内部
+    /// </summary>
+    private bool IsInsideUsingStatement(SyntaxNode node)
+    {
+        var parent = node.Parent;
+        while (parent != null)
+        {
+            if (parent is UsingStatementSyntax usingStmt)
+            {
+                // 检查该声明是否就是 using 的声明部分
+                if (usingStmt.Declaration != null)
+                {
+                    // 这是一个 using(var x = ...) { } 语句
+                    return true;
+                }
+            }
+            // 如果遇到方法/lambda/匿名方法，不再向上查找
+            if (parent is MethodDeclarationSyntax ||
+                parent is AnonymousFunctionExpressionSyntax ||
+                parent is LocalFunctionStatementSyntax)
+                break;
+            parent = parent.Parent;
+        }
+        return false;
+    }
+
+    /// <summary>
+    /// SEC007: 检测 IDisposable 资源创建未使用 using 管理
+    /// </summary>
+    private void AnalyzeResourceLeak(SyntaxNodeAnalysisContext context)
+    {
+        var localDecl = (LocalDeclarationStatementSyntax)context.Node;
+
+        // 检查是否已经是 using var 声明
+        if (HasUsingModifier(localDecl))
+            return;
+
+        // 检查父节点是否是 using 语句
+        if (IsInsideUsingStatement(localDecl))
+            return;
+
+        var declaration = localDecl.Declaration;
+
+        foreach (var variable in declaration.Variables)
+        {
+            // 只检测初始化为 new Xxx(...) 的情况，避免误报 conn = GetConnection() 等工厂方法
+            if (!(variable.Initializer?.Value is ObjectCreationExpressionSyntax objectCreation))
+                continue;
+
+            string typeName = GetSimpleTypeName(objectCreation.Type);
+            if (!DisposableTypeNames.Contains(typeName))
+                continue;
+
+            context.ReportDiagnostic(Diagnostic.Create(
+                ResourceLeakRule,
+                variable.GetLocation(),
+                typeName));
+        }
+    }
+
+    // ═════════════════════════════════════════════════════════════════
+    // SEC008: 不安全临时文件创建
+    // ═════════════════════════════════════════════════════════════════
+
+    /// <summary>
+    /// 检查是否是安全的随机文件名生成方式
+    /// </summary>
+    private bool IsSafeRandomFileName(ExpressionSyntax expression)
+    {
+        string text = expression.ToString();
+        // Path.GetRandomFileName() — 密码学安全的随机文件名
+        if (text.Contains("GetRandomFileName"))
+            return true;
+        // Guid.NewGuid().ToString() — 密码学安全的UUID
+        if (text.Contains("Guid.NewGuid") || text.Contains("NewGuid()"))
+            return true;
+        // Path.GetTempFileName() — 系统生成的安全临时文件
+        if (text.Contains("GetTempFileName"))
+            return true;
+        return false;
+    }
+
+    /// <summary>
+    /// 检查文本是否包含DateTime相关的可预测表达式
+    /// </summary>
+    private bool IsDateTimeExpression(string text)
+    {
+        return text.IndexOf("DateTime.Now", StringComparison.OrdinalIgnoreCase) >= 0 ||
+               text.IndexOf("DateTime.UtcNow", StringComparison.OrdinalIgnoreCase) >= 0 ||
+               text.IndexOf("DateTime.Today", StringComparison.OrdinalIgnoreCase) >= 0 ||
+               text.IndexOf(".Ticks", StringComparison.OrdinalIgnoreCase) >= 0 ||
+               text.IndexOf("Environment.TickCount", StringComparison.OrdinalIgnoreCase) >= 0;
+    }
+
+    /// <summary>
+    /// 检查表达式是否是顺序性/可预测的ID（如计数器、进程ID等）
+    /// </summary>
+    private bool IsSequentialIdExpression(ExpressionSyntax expression)
+    {
+        string text = expression.ToString();
+        return text.IndexOf("Process.GetCurrentProcess().Id", StringComparison.OrdinalIgnoreCase) >= 0 ||
+               text.IndexOf("Environment.ProcessId", StringComparison.OrdinalIgnoreCase) >= 0 ||
+               text.IndexOf("Thread.CurrentThread.ManagedThreadId", StringComparison.OrdinalIgnoreCase) >= 0;
+    }
+
+    /// <summary>
+    /// 识别可预测的临时文件名构造模式，返回模式描述；若是安全模式则返回null
+    /// </summary>
+    private string GetPredictableTempFilePattern(ExpressionSyntax expression)
+    {
+        // 先排除安全的随机文件名生成方式
+        if (IsSafeRandomFileName(expression))
+            return null;
+
+        // 模式1：字符串插值 $"..."
+        if (expression is InterpolatedStringExpressionSyntax interpolated)
+        {
+            foreach (var content in interpolated.Contents)
+            {
+                if (content is InterpolationSyntax interp)
+                {
+                    string interpText = interp.Expression.ToString();
+                    if (IsDateTimeExpression(interpText) || IsSequentialIdExpression(interp.Expression))
+                        return $"字符串插值包含可预测值({TruncateLongText(interpText, 30)})";
+                }
+            }
+            return "字符串插值($\"\")构造的文件名结构可预测";
+        }
+
+        // 模式2：字符串拼接 "prefix_" + something
+        if (expression is BinaryExpressionSyntax binary &&
+            binary.OperatorToken.IsKind(SyntaxKind.PlusToken))
+        {
+            string binaryText = expression.ToString();
+            if (IsDateTimeExpression(binaryText))
+                return $"字符串拼接包含时间戳({TruncateLongText(binaryText, 30)})";
+            return "字符串拼接(+)构造的文件名结构可预测";
+        }
+
+        // 模式3：string.Format(...)
+        if (expression is InvocationExpressionSyntax invoc)
+        {
+            string invocText = expression.ToString();
+            if (invocText.StartsWith("string.Format", StringComparison.OrdinalIgnoreCase) ||
+                invocText.StartsWith("String.Format", StringComparison.OrdinalIgnoreCase))
+                return "string.Format()构造的文件名结构可预测";
+
+            if (IsDateTimeExpression(invocText))
+                return "使用了时间戳(" + TruncateLongText(invocText, 30) + ")，时间戳可预测";
+        }
+
+        // 模式4：直接的成员访问表达式（DateTime.Now.Ticks 等）
+        if (expression is MemberAccessExpressionSyntax)
+        {
+            string maText = expression.ToString();
+            if (IsDateTimeExpression(maText))
+                return "使用了时间戳(" + TruncateLongText(maText, 30) + ")，时间戳可预测";
+        }
+
+        return null;
+    }
+
+    /// <summary>
+    /// 判断表达式是否是 Path.GetTempPath() 调用
+    /// </summary>
+    private bool IsGetTempPathCall(ExpressionSyntax expression)
+    {
+        if (!(expression is InvocationExpressionSyntax invocation))
+            return false;
+        if (!(invocation.Expression is MemberAccessExpressionSyntax memberAccess))
+            return false;
+
+        return memberAccess.Name.Identifier.Text.Equals("GetTempPath", StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// SEC008: 检测 Path.Combine(Path.GetTempPath(), predictable_name) 模式
+    /// </summary>
+    private void AnalyzeInsecureTempFile(SyntaxNodeAnalysisContext context)
+    {
+        var invocation = (InvocationExpressionSyntax)context.Node;
+
+        // 检查是否是 Path.Combine 调用
+        if (!(invocation.Expression is MemberAccessExpressionSyntax memberAccess))
+            return;
+
+        string methodName = memberAccess.Name.Identifier.Text;
+        if (!methodName.Equals("Combine", StringComparison.Ordinal))
+            return;
+
+        // 检查接收者是否是 Path（或全限定的 System.IO.Path）
+        string receiverText = memberAccess.Expression.ToString();
+        if (!receiverText.Equals("Path", StringComparison.Ordinal) &&
+            !receiverText.EndsWith(".Path", StringComparison.Ordinal))
+            return;
+
+        var args = invocation.ArgumentList.Arguments;
+        if (args.Count < 2)
+            return;
+
+        // 检查第一个参数是否是 Path.GetTempPath() 调用
+        if (!IsGetTempPathCall(args[0].Expression))
+            return;
+
+        // 检查后续参数中是否有可预测的文件名构造方式
+        for (int i = 1; i < args.Count; i++)
+        {
+            string predictablePattern = GetPredictableTempFilePattern(args[i].Expression);
+            if (predictablePattern != null)
+            {
+                context.ReportDiagnostic(Diagnostic.Create(
+                    InsecureTempFileRule,
+                    args[i].GetLocation(),
+                    predictablePattern));
+                return; // 每个 Path.Combine 调用只报告一次
+            }
+        }
     }
 }

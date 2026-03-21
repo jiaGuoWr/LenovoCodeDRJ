@@ -268,6 +268,21 @@ public class LenovoQiraCodeAnalyzerAnalyzer : DiagnosticAnalyzer
                 context.ReportDiagnostic(Diagnostic.Create(Rule, location, commentText));
             }
         }
+
+        // 检测字符串字面量中的中文字符
+        foreach (var node in root.DescendantNodes())
+        {
+            if (node.IsKind(SyntaxKind.StringLiteralExpression))
+            {
+                var literal = (LiteralExpressionSyntax)node;
+                var value = literal.Token.ValueText;
+                if (!string.IsNullOrEmpty(value) && chineseRegex.IsMatch(value))
+                {
+                    var loc = Location.Create(context.Tree, node.Span);
+                    context.ReportDiagnostic(Diagnostic.Create(Rule, loc, value));
+                }
+            }
+        }
     }
 
     private void AnalyzeDllImportSearchPaths(SyntaxNodeAnalysisContext context)
@@ -1026,7 +1041,17 @@ public class LenovoQiraCodeAnalyzerAnalyzer : DiagnosticAnalyzer
         // 检查方法调用（如 Console.ReadLine(), stream.Read() 等）
         if (expression is InvocationExpressionSyntax invocation)
         {
-            var invocText = invocation.ToString().ToLowerInvariant();
+            // 豁免已知安全的系统路径/随机 API，避免误报
+            var invocStr = invocation.ToString();
+            if (invocStr.Contains("GetTempPath") ||
+                invocStr.Contains("GetTempFileName") ||
+                invocStr.Contains("GetRandomFileName") ||
+                invocStr.Contains("NewGuid") ||
+                invocStr.Contains("GetCurrentDirectory") ||
+                invocStr.Contains("GetFolderPath"))
+                return false;
+
+            var invocText = invocStr.ToLowerInvariant();
             if (invocText.Contains("read") || invocText.Contains("input") ||
                 invocText.Contains("get") || invocText.Contains("receive"))
             {
@@ -1314,7 +1339,7 @@ public class LenovoQiraCodeAnalyzerAnalyzer : DiagnosticAnalyzer
 
         // 检查调用者是否是 Random 类型
         var callerText = memberAccess.Expression.ToString();
-        if (callerText.EndsWith("Random", StringComparison.Ordinal) &&
+        if (callerText.EndsWith("Random", StringComparison.OrdinalIgnoreCase) &&
             !callerText.Contains("Crypto") &&
             !callerText.Contains("Secure") &&
             !callerText.Contains("Security"))

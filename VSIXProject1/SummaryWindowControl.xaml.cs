@@ -29,32 +29,30 @@ namespace VSIXProject1
     /// </summary>
     public partial class SummaryWindowControl : UserControl
     {
+        // ViewModel 类用于 WPF 数据绑定，支持虚拟化
+        public class DiagnosticFileGroup
+        {
+            public string HeaderText { get; set; }
+            public List<DiagnosticItem> Diagnostics { get; set; } = new List<DiagnosticItem>();
+        }
+
+        public class DiagnosticItem
+        {
+            public string DisplayText { get; set; }
+            public Diagnostic Diagnostic { get; set; }
+        }
+
         private IVsSolution _solution;
         private AsyncPackage _package;
 
         public event EventHandler RefreshRequested;
 
-        // 延迟分析定时器 - 用于保存后防抖
-        private DispatcherTimer _analysisDelayTimer;
-        // 保存后触发分析使用更保守延迟，优先保证编辑器流畅性，尤其是大文件保存场景
-        private const int ANALYSIS_DELAY_MS = 2500;
         private bool _isLanguageChangedSubscribed;
         private List<Diagnostic> _latestDiagnostics = new List<Diagnostic>();
 
         public SummaryWindowControl()
         {
             InitializeComponent();
-
-            // 初始化延迟分析定时器
-            _analysisDelayTimer = new DispatcherTimer
-            {
-                Interval = TimeSpan.FromMilliseconds(ANALYSIS_DELAY_MS)
-            };
-            _analysisDelayTimer.Tick += (s, e) =>
-            {
-                _analysisDelayTimer.Stop();
-                RefreshRequested?.Invoke(this, EventArgs.Empty);
-            };
         }
 
         public void Initialize(AsyncPackage package)
@@ -130,8 +128,6 @@ namespace VSIXProject1
         private class RunningDocumentTableEventsHandler : IVsRunningDocTableEvents
         {
             private SummaryWindowControl _control;
-            private static DateTime _lastSaveTime = DateTime.MinValue;
-            private static readonly TimeSpan SAVE_THROTTLE_INTERVAL = TimeSpan.FromSeconds(5); // 增加到5秒
 
             public RunningDocumentTableEventsHandler(SummaryWindowControl control)
             {
@@ -150,19 +146,8 @@ namespace VSIXProject1
 
             public int OnAfterSave(uint docCookie)
             {
-                // 文档保存后使用延迟定时器触发刷新，避免保存卡顿
-                // 如果在延迟期间再次保存，定时器会重置，确保只在用户停止输入后分析
-                var now = DateTime.Now;
-                if (now - _lastSaveTime > SAVE_THROTTLE_INTERVAL)
-                {
-                    _lastSaveTime = now;
-                    // 使用延迟定时器而不是立即触发，避免保存卡顿
-                    _control.Dispatcher.BeginInvoke(new Action(() =>
-                    {
-                        _control._analysisDelayTimer.Stop();
-                        _control._analysisDelayTimer.Start();
-                    }));
-                }
+                // 文档保存后触发刷新（交由 MyToolWindowCommand 进行统一防抖，避免重复分析与卡顿）
+                _control.RefreshRequested?.Invoke(_control, EventArgs.Empty);
                 return VSConstants.S_OK;
             }
 
@@ -299,118 +284,66 @@ namespace VSIXProject1
             await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
 
             Debug.WriteLine("开始更新分析结果");
-            DiagnosticsTree.Items.Clear();
-            _diagnosticMap.Clear();
             _latestDiagnostics = diagnostics?.ToList() ?? new List<Diagnostic>();
 
             if (diagnostics == null)
             {
                 Debug.WriteLine("UpdateAnalysisResults: diagnostics 为空");
+                DiagnosticsTree.ItemsSource = null;
                 return;
             }
 
             // 使用 DiagnosticEqualityComparer 去重 - 确保不同位置的问题都能显示
             var uniqueDiagnostics = diagnostics.Distinct(_diagnosticComparer).ToList();
 
-            // 动态计算批次大小
-            int batchSize = CalculateBatchSize(uniqueDiagnostics.Count);
-            Debug.WriteLine($"动态批次大小: {batchSize} (总诊断数: {uniqueDiagnostics.Count})");
-
             Debug.WriteLine($"UpdateAnalysisResults: 去重后诊断数量={uniqueDiagnostics.Count}");
 
             if (uniqueDiagnostics.Count == 0)
             {
+                DiagnosticsTree.ItemsSource = null;
                 return;
             }
 
-            // 显示所有诊断（TreeView 已配置虚拟化，可高效处理大量数据）
-            var diagnosticsToShow = uniqueDiagnostics;
-
-            // 按文件路径分组
-            var groupedDiagnostics = diagnosticsToShow
-                .GroupBy(d =>
-                {
-                    try
-                    {
-                        var path = d.Location?.GetLineSpan().Path;
-                        return string.IsNullOrEmpty(path) ? GetUnknownFileText() : path;
-                    }
-                    catch
-                    {
-                        return GetUnknownFileText();
-                    }
-                })
-                .OrderBy(g => g.Key)
-                .ToList();
-
-            // 分批处理，避免UI阻塞
-            var rootNodes = new List<TreeViewItem>();
-            int totalProcessed = 0;
-
-            foreach (var group in groupedDiagnostics)
+            // 异步构建 ViewModel 数据
+            var groupedDiagnostics = await Task.Run(() =>
             {
-                // 创建文件分组节点 - 使用 TextBlock 以便设置颜色
-                var fileHeader = new TextBlock
-                {
-                    Text = $"{group.Key} ({group.Count()})",
-                    FontWeight = FontWeights.Bold,
-                    Foreground = GetFileGroupBrush()
-                };
-
-                var fileNode = new TreeViewItem
-                {
-                    Header = fileHeader,
-                    IsExpanded = true // 默认展开，方便查看所有诊断
-                };
-
-                foreach (var diagnostic in group)
-                {
-                    try
+                return uniqueDiagnostics
+                    .GroupBy(d =>
                     {
-                        var lineSpan = diagnostic.Location.GetLineSpan();
-                        int line = lineSpan.StartLinePosition.Line + 1;
-                        string lineLabel = GetLineLabel(line);
-                        string localizedMessage = DiagnosticMessageLocalizer.GetDisplayMessage(diagnostic);
-
-                        // 创建带颜色区分的诊断项文本
-                        var itemText = new TextBlock
+                        try
                         {
-                            Text = $"{lineLabel} {diagnostic.Id}: {localizedMessage}",
-                            Foreground = GetDiagnosticItemBrush()
-                        };
-
-                        var itemNode = new TreeViewItem
+                            var path = d.Location?.GetLineSpan().Path;
+                            return string.IsNullOrEmpty(path) ? GetUnknownFileText() : path;
+                        }
+                        catch
                         {
-                            Header = itemText,
-                            Tag = diagnostic,
-                            IsExpanded = false
-                        };
-                        fileNode.Items.Add(itemNode);
-                        _diagnosticMap[itemText.Text] = diagnostic;
-                        totalProcessed++;
-                    }
-                    catch (Exception ex)
+                            return GetUnknownFileText();
+                        }
+                    })
+                    .OrderBy(g => g.Key)
+                    .Select(g => new DiagnosticFileGroup
                     {
-                        Debug.WriteLine($"处理诊断时出错: {ex.Message}");
-                    }
-                }
+                        HeaderText = $"{g.Key} ({g.Count()})",
+                        Diagnostics = g.Select(diagnostic =>
+                        {
+                            var lineSpan = diagnostic.Location.GetLineSpan();
+                            int line = lineSpan.StartLinePosition.Line + 1;
+                            string lineLabel = GetLineLabel(line);
+                            string localizedMessage = DiagnosticMessageLocalizer.GetDisplayMessage(diagnostic);
 
-                rootNodes.Add(fileNode);
+                            return new DiagnosticItem
+                            {
+                                DisplayText = $"{lineLabel} {diagnostic.Id}: {localizedMessage}",
+                                Diagnostic = diagnostic
+                            };
+                        }).ToList()
+                    }).ToList();
+            });
 
-                // 每处理 batchSize 个诊断，让出时间片给UI线程
-                if (totalProcessed % batchSize == 0)
-                {
-                    await Task.Yield();
-                }
-            }
+            // 绑定到 TreeView
+            DiagnosticsTree.ItemsSource = groupedDiagnostics;
 
-            // 批量添加到树控件
-            foreach (var node in rootNodes)
-            {
-                DiagnosticsTree.Items.Add(node);
-            }
-
-            Debug.WriteLine($"UpdateAnalysisResults: 完成更新，{groupedDiagnostics.Count} 个文件分组，共 {_diagnosticMap.Count} 个诊断");
+            Debug.WriteLine($"UpdateAnalysisResults: 完成更新，{groupedDiagnostics.Count} 个文件分组");
         }
 
         /// <summary>
@@ -455,9 +388,9 @@ namespace VSIXProject1
         {
             ThreadHelper.ThrowIfNotOnUIThread();
 
-            if (DiagnosticsTree.SelectedItem is TreeViewItem selectedItem && selectedItem.Tag is Diagnostic diagnostic)
+            if (DiagnosticsTree.SelectedItem is DiagnosticItem item && item.Diagnostic != null)
             {
-                NavigateToErrorLocation(diagnostic);
+                NavigateToErrorLocation(item.Diagnostic);
             }
         }
 
@@ -515,8 +448,7 @@ namespace VSIXProject1
         public void ClearResults()
         {
             ThreadHelper.ThrowIfNotOnUIThread();
-            DiagnosticsTree.Items.Clear();
-            _diagnosticMap.Clear();
+            DiagnosticsTree.ItemsSource = null;
         }
 
         // 更新 Git 状态显示

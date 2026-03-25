@@ -18,6 +18,7 @@ using LenovoAnalyzer;
 using System.Runtime.InteropServices;
 using System.Diagnostics;
 using VSIXProject1.Localization;
+using Microsoft.VisualStudio.Threading;
 
 namespace VSIXProject1
 {
@@ -142,7 +143,7 @@ namespace VSIXProject1
         // 防抖定时器，用于延迟执行分析
         private System.Threading.Timer _debounceTimer;
         private readonly object _debounceLock = new object();
-        private const int DEBOUNCE_DELAY_MS = 1000; // 1秒防抖延迟
+        private const int DEBOUNCE_DELAY_MS = 2000; // 2秒防抖延迟，避免大文件频繁保存卡顿
         private readonly SemaphoreSlim _refreshExecutionGate = new SemaphoreSlim(1, 1);
         private CancellationTokenSource _refreshAnalysisCts;
         private int _pendingRefreshRequests = 0;
@@ -439,286 +440,146 @@ namespace VSIXProject1
         public async Task<IEnumerable<Diagnostic>> AnalyzeSolutionAsync(IProgress<AnalysisProgress> progress = null, CancellationToken cancellationToken = default)
         {
             var diagnostics = new List<Diagnostic>();
-            int completedFiles = 0;
-
-            try
+            
+            // 必须在UI线程上收集所有需要分析的文件路径，避免在后台线程调用 COM 对象
+            await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync(cancellationToken);
+            IVsSolution solution = package.GetService<SVsSolution, IVsSolution>();
+            if (solution == null)
             {
-                // 获取当前打开的解决方案前切到UI线程
-                await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync(cancellationToken);
-                IVsSolution solution = package.GetService<SVsSolution, IVsSolution>();
-                if (solution == null)
+                System.Diagnostics.Debug.WriteLine("AnalyzeSolutionAsync: solution 为空");
+                return diagnostics;
+            }
+
+            string solutionPath = string.Empty;
+            solution.GetSolutionInfo(out solutionPath, out _, out _);
+            System.Diagnostics.Debug.WriteLine($"AnalyzeSolutionAsync: solutionPath={solutionPath}");
+
+            // 检查 Git 根目录等信息，不需要是COM调用但在此处执行很快
+            bool isGitRepository = GitHelper.Instance.IsGitRepository(solutionPath);
+            string gitRoot = GitHelper.Instance.GetGitRoot(solutionPath);
+            bool useIncrementalAnalysis = IsIncrementalAnalysis;
+            
+            List<string> filesToAnalyze = new List<string>();
+
+            if (isGitRepository && !string.IsNullOrEmpty(gitRoot))
+            {
+                if (_gitEventMonitor == null)
                 {
-                    System.Diagnostics.Debug.WriteLine("AnalyzeSolutionAsync: solution 为空");
-                    return diagnostics;
+                    StartGitEventMonitoring(solutionPath);
                 }
 
-                // 获取解决方案路径
-                string solutionPath = string.Empty;
-                solution.GetSolutionInfo(out solutionPath, out _, out _);
-                System.Diagnostics.Debug.WriteLine($"AnalyzeSolutionAsync: solutionPath={solutionPath}");
-
-                // 获取方案后，切到后台线程，避免阻塞UI线程导致卡顿
+                // 获取更改的文件可能涉及 IO，可以切到后台
                 await TaskScheduler.Default;
-
-                // 检查是否为 Git 仓库
-                bool isGitRepository = GitHelper.Instance.IsGitRepository(solutionPath);
-                System.Diagnostics.Debug.WriteLine($"AnalyzeSolutionAsync: isGitRepository={isGitRepository}");
-
-                // 检查是否找到 Git 根目录
-                string gitRoot = GitHelper.Instance.GetGitRoot(solutionPath);
-                System.Diagnostics.Debug.WriteLine($"AnalyzeSolutionAsync: gitRoot={gitRoot}");
-
-                // 只在找到 Git 根目录时才启动监控
-                if (isGitRepository && !string.IsNullOrEmpty(gitRoot))
+                var changedFiles = GitHelper.Instance.GetChangedFiles(solutionPath);
+                if (changedFiles.Any())
                 {
-                    // 只在监听器未启动时启动
-                    if (_gitEventMonitor == null)
-                    {
-                        // 启动 Git 事件监听
-                        StartGitEventMonitoring(solutionPath);
-                    }
-
-                    // 获取更改的文件
-                    var changedFiles = GitHelper.Instance.GetChangedFiles(solutionPath);
-                    System.Diagnostics.Debug.WriteLine($"发现 {changedFiles.Count()} 个更改文件");
-
-                    // 检查是否使用增量分析模式
-                    bool useIncrementalAnalysis = IsIncrementalAnalysis;
-
-                    // 有Git仓库的情况
-                    if (changedFiles.Any())
-                    {
-                        // 有更改文件，使用增量分析模式
-                        Debug.WriteLine("使用增量分析模式");
-                        Debug.WriteLine($"发现 {changedFiles.Count()} 个更改文件");
-
-                        try
-                        {
-                            // 过滤掉排除目录中的文件
-                            var filesToAnalyze = changedFiles
-                                .Where(f => !ShouldExcludeDirectory(f))
-                                .ToList();
-
-                            Debug.WriteLine($"过滤后待分析文件数: {filesToAnalyze.Count}");
-                            int totalFiles = filesToAnalyze.Count;
-
-                            // 报告开始
-                            progress?.Report(new AnalysisProgress { CompletedFiles = 0, TotalFiles = totalFiles, CurrentFile = "准备分析..." });
-
-                            // 使用并行处理分析更改的文件
-                            var options = new ParallelOptions
-                            {
-                                MaxDegreeOfParallelism = Math.Max(1, Environment.ProcessorCount / 2),
-                                CancellationToken = cancellationToken
-                            };
-
-                            var fileDiagnosticsList = new List<Diagnostic>[filesToAnalyze.Count];
-                            var progressLock = new object();
-
-                            await Task.Run(() =>
-                            {
-                                Parallel.For(0, filesToAnalyze.Count, options, i =>
-                                {
-                                    try
-                                    {
-                                        cancellationToken.ThrowIfCancellationRequested();
-                                        Debug.WriteLine($"分析文件: {filesToAnalyze[i]}");
-
-                                        // 报告进度
-                                        lock (progressLock)
-                                        {
-                                            progress?.Report(new AnalysisProgress
-                                            {
-                                                CompletedFiles = completedFiles,
-                                                TotalFiles = totalFiles,
-                                                CurrentFile = filesToAnalyze[i]
-                                            });
-                                        }
-
-                                        // 直接调用同步方法，避免在 Parallel.For 中使用 .GetAwaiter().GetResult()
-                                        var fileDiagnostics = AnalyzeFile(filesToAnalyze[i], cancellationToken);
-                                        fileDiagnosticsList[i] = fileDiagnostics.ToList();
-
-                                        Interlocked.Increment(ref completedFiles);
-                                    }
-                                    catch (OperationCanceledException)
-                                    {
-                                        throw;
-                                    }
-                                    catch (Exception ex)
-                                    {
-                                        Debug.WriteLine($"分析文件失败 {filesToAnalyze[i]}: {ex.Message}");
-                                        fileDiagnosticsList[i] = new List<Diagnostic>();
-                                        Interlocked.Increment(ref completedFiles);
-                                    }
-                                });
-                            }, cancellationToken);
-
-                            foreach (var fileDiagnostics in fileDiagnosticsList)
-                            {
-                                if (fileDiagnostics != null)
-                                {
-                                    diagnostics.AddRange(fileDiagnostics);
-                                }
-                            }
-
-                            // 报告完成
-                            progress?.Report(new AnalysisProgress { CompletedFiles = totalFiles, TotalFiles = totalFiles, CurrentFile = "分析完成", IsCompleted = true });
-                        }
-                        catch (Exception ex)
-                        {
-                            Debug.WriteLine($"Git 操作失败: {ex.Message}");
-                            Debug.WriteLine($"异常堆栈: {ex.StackTrace}");
-                        }
-                    }
-                    else
-                    {
-                        // 没有更改文件，返回空列表
-                        Debug.WriteLine("无更改文件，返回空诊断列表");
-                        return Enumerable.Empty<Diagnostic>();
-                    }
+                    filesToAnalyze = changedFiles.Where(f => !ShouldExcludeDirectory(f)).ToList();
                 }
                 else
                 {
-                    // 没有找到 Git 根目录，使用全量分析模式
-                    System.Diagnostics.Debug.WriteLine("使用全量分析模式");
-
-                    // 遍历解决方案中的所有项目
-                    IEnumHierarchies enumHierarchies;
-                    Guid guid = Guid.Empty;
-                    solution.GetProjectEnum((uint)__VSENUMPROJFLAGS.EPF_LOADEDINSOLUTION, ref guid, out enumHierarchies);
-                    if (enumHierarchies == null)
-                    {
-                        System.Diagnostics.Debug.WriteLine("AnalyzeSolutionAsync: enumHierarchies 为空");
-                        return diagnostics;
-                    }
-
+                    return Enumerable.Empty<Diagnostic>();
+                }
+            }
+            else
+            {
+                // 全量分析模式：必须在UI线程上遍历 COM 项目层次结构
+                System.Diagnostics.Debug.WriteLine("使用全量分析模式");
+                IEnumHierarchies enumHierarchies;
+                Guid guid = Guid.Empty;
+                solution.GetProjectEnum((uint)__VSENUMPROJFLAGS.EPF_LOADEDINSOLUTION, ref guid, out enumHierarchies);
+                if (enumHierarchies != null)
+                {
                     IVsHierarchy[] hierarchies = new IVsHierarchy[1];
                     uint fetched;
                     while (enumHierarchies.Next(1, hierarchies, out fetched) == 0 && fetched == 1)
                     {
                         cancellationToken.ThrowIfCancellationRequested();
-                        var projectDiagnostics = await AnalyzeProjectAsync(hierarchies[0], progress, cancellationToken);
-                        diagnostics.AddRange(projectDiagnostics);
-                    }
-                }
-            }
-            catch (OperationCanceledException)
-            {
-                System.Diagnostics.Debug.WriteLine("AnalyzeSolutionAsync: 分析被取消");
-                throw;
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"AnalyzeSolutionAsync 错误: {ex.Message}");
-            }
-
-            // 对诊断信息进行去重
-            var uniqueDiagnostics = diagnostics.Distinct(new DiagnosticEqualityComparer()).ToList();
-            System.Diagnostics.Debug.WriteLine($"AnalyzeSolutionAsync: 去重前诊断数={diagnostics.Count}, 去重后诊断数={uniqueDiagnostics.Count}");
-            return uniqueDiagnostics;
-        }
-
-        private async Task<IEnumerable<Diagnostic>> AnalyzeProjectAsync(IVsHierarchy hierarchy, IProgress<AnalysisProgress> progress = null, CancellationToken cancellationToken = default)
-        {
-            var diagnostics = new List<Diagnostic>();
-            int completedFiles = 0;
-
-            try
-            {
-                // 获取项目的完整路径
-                string projectPath = string.Empty;
-                hierarchy.GetCanonicalName((uint)VSConstants.VSITEMID.Root, out projectPath);
-                if (string.IsNullOrEmpty(projectPath))
-                {
-                    return diagnostics;
-                }
-
-                // 分析项目中的所有C#文件
-                string projectDirectory = Path.GetDirectoryName(projectPath);
-                if (Directory.Exists(projectDirectory))
-                {
-                    var csFiles = Directory.EnumerateFiles(projectDirectory, "*.cs", SearchOption.AllDirectories)
-                        .Where(f => !ShouldExcludeDirectory(f))
-                        .ToList();
-
-                    Debug.WriteLine($"AnalyzeProjectAsync: 发现 {csFiles.Count} 个C#文件待分析");
-                    int totalFiles = csFiles.Count;
-
-                    // 报告开始
-                    progress?.Report(new AnalysisProgress { CompletedFiles = 0, TotalFiles = totalFiles, CurrentFile = "准备分析..." });
-
-                    // 使用并行处理，但限制并发数
-                    var options = new ParallelOptions
-                    {
-                        MaxDegreeOfParallelism = Math.Max(1, Environment.ProcessorCount / 2),
-                        CancellationToken = cancellationToken
-                    };
-
-                    var fileDiagnosticsList = new List<Diagnostic>[csFiles.Count];
-                    var progressLock = new object();
-
-                    await Task.Run(() =>
-                    {
-                        Parallel.For(0, csFiles.Count, options, i =>
+                        string projectPath = string.Empty;
+                        hierarchies[0].GetCanonicalName((uint)VSConstants.VSITEMID.Root, out projectPath);
+                        if (!string.IsNullOrEmpty(projectPath))
                         {
-                            try
+                            string projectDirectory = Path.GetDirectoryName(projectPath);
+                            if (Directory.Exists(projectDirectory))
                             {
-                                cancellationToken.ThrowIfCancellationRequested();
-
-                                // 报告进度
-                                lock (progressLock)
-                                {
-                                    progress?.Report(new AnalysisProgress
-                                    {
-                                        CompletedFiles = completedFiles,
-                                        TotalFiles = totalFiles,
-                                        CurrentFile = csFiles[i]
-                                    });
-                                }
-
-                                // 直接调用同步方法，避免在 Parallel.For 中使用 .GetAwaiter().GetResult()
-                                var fileDiagnostics = AnalyzeFile(csFiles[i], cancellationToken);
-                                fileDiagnosticsList[i] = fileDiagnostics.ToList();
-
-                                Interlocked.Increment(ref completedFiles);
+                                var csFiles = Directory.EnumerateFiles(projectDirectory, "*.cs", SearchOption.AllDirectories)
+                                    .Where(f => !ShouldExcludeDirectory(f));
+                                filesToAnalyze.AddRange(csFiles);
                             }
-                            catch (OperationCanceledException)
-                            {
-                                throw;
-                            }
-                            catch (Exception ex)
-                            {
-                                Debug.WriteLine($"分析文件失败 {csFiles[i]}: {ex.Message}");
-                                fileDiagnosticsList[i] = new List<Diagnostic>();
-                                Interlocked.Increment(ref completedFiles);
-                            }
-                        });
-                    }, cancellationToken);
-
-                    foreach (var fileDiagnostics in fileDiagnosticsList)
-                    {
-                        if (fileDiagnostics != null)
-                        {
-                            diagnostics.AddRange(fileDiagnostics);
                         }
                     }
-
-                    // 报告完成
-                    progress?.Report(new AnalysisProgress { CompletedFiles = totalFiles, TotalFiles = totalFiles, CurrentFile = "分析完成", IsCompleted = true });
                 }
-            }
-            catch (OperationCanceledException)
-            {
-                throw;
-            }
-            catch (Exception ex)
-            {
-                Debug.WriteLine($"AnalyzeProjectAsync 错误: {ex.Message}");
+                
+                // 去重
+                filesToAnalyze = filesToAnalyze.Distinct().ToList();
             }
 
-            return diagnostics;
+            // 现在我们有了一个纯字符串列表，安全切换到真正的后台线程执行繁重的分析任务
+            return await Task.Run(() =>
+            {
+                int completedFiles = 0;
+                int totalFiles = filesToAnalyze.Count;
+                
+                if (totalFiles == 0) return diagnostics;
+                
+                progress?.Report(new AnalysisProgress { CompletedFiles = 0, TotalFiles = totalFiles, CurrentFile = "准备分析..." });
+
+                var options = new ParallelOptions
+                {
+                    MaxDegreeOfParallelism = Math.Max(1, Environment.ProcessorCount / 2),
+                    CancellationToken = cancellationToken
+                };
+
+                var fileDiagnosticsList = new List<Diagnostic>[totalFiles];
+                var progressLock = new object();
+
+                Parallel.For(0, totalFiles, options, i =>
+                {
+                    try
+                    {
+                        cancellationToken.ThrowIfCancellationRequested();
+
+                        lock (progressLock)
+                        {
+                            progress?.Report(new AnalysisProgress
+                            {
+                                CompletedFiles = completedFiles,
+                                TotalFiles = totalFiles,
+                                CurrentFile = filesToAnalyze[i]
+                            });
+                        }
+
+                        var fileDiagnostics = AnalyzeFile(filesToAnalyze[i], cancellationToken);
+                        fileDiagnosticsList[i] = fileDiagnostics.ToList();
+
+                        Interlocked.Increment(ref completedFiles);
+                    }
+                    catch (OperationCanceledException)
+                    {
+                        throw;
+                    }
+                    catch (Exception ex)
+                    {
+                        Debug.WriteLine($"分析文件失败 {filesToAnalyze[i]}: {ex.Message}");
+                        fileDiagnosticsList[i] = new List<Diagnostic>();
+                        Interlocked.Increment(ref completedFiles);
+                    }
+                });
+
+                foreach (var fileDiagnostics in fileDiagnosticsList)
+                {
+                    if (fileDiagnostics != null)
+                    {
+                        diagnostics.AddRange(fileDiagnostics);
+                    }
+                }
+
+                progress?.Report(new AnalysisProgress { CompletedFiles = totalFiles, TotalFiles = totalFiles, CurrentFile = "分析完成", IsCompleted = true });
+
+                var uniqueDiagnostics = diagnostics.Distinct(new DiagnosticEqualityComparer()).ToList();
+                return uniqueDiagnostics;
+            }, cancellationToken);
         }
+
 
         // 共享的编译引用，避免重复创建
         private static readonly Lazy<ImmutableArray<MetadataReference>> _sharedReferences = new Lazy<ImmutableArray<MetadataReference>>(() =>

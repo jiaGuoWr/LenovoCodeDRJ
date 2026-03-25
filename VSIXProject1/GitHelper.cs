@@ -608,23 +608,15 @@ namespace VSIXProject1
                             EnableRaisingEvents = true
                         };
 
-                        // 避免频繁触发，使用节流
-                        DateTime lastTriggerTime = DateTime.MinValue;
-                        TimeSpan throttleInterval = TimeSpan.FromSeconds(2); // 增加节流间隔到2秒
-                        object triggerLock = new object();
+                        System.Threading.Timer gitEventDebounce = new System.Threading.Timer(_ => 
+                        {
+                            onGitChange?.Invoke();
+                        }, null, Timeout.Infinite, Timeout.Infinite);
 
-                        // 统一的事件处理方法
                         void HandleFileEvent(string eventType, string filePath)
                         {
-                            lock (triggerLock)
-                            {
-                                if (DateTime.Now - lastTriggerTime > throttleInterval)
-                                {
-                                    lastTriggerTime = DateTime.Now;
-                                    System.Diagnostics.Debug.WriteLine($"MonitorGitEvents: 检测到文件{eventType}: {filePath}");
-                                    onGitChange?.Invoke();
-                                }
-                            }
+                            // 使用简单的节流/防抖，合并频繁的文件更改事件
+                            gitEventDebounce.Change(500, Timeout.Infinite);
                         }
 
                         workDirWatcher.Changed += (s, e) => HandleFileEvent("变化", e.FullPath);
@@ -632,6 +624,7 @@ namespace VSIXProject1
                         workDirWatcher.Deleted += (s, e) => HandleFileEvent("删除", e.FullPath);
 
                         disposables.Add(workDirWatcher);
+                        disposables.Add(gitEventDebounce);
                         System.Diagnostics.Debug.WriteLine($"MonitorGitEvents: 已添加工作目录监听器: {solutionDir}");
                     }
                 }

@@ -1,0 +1,216 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <xsd:schema id="root" xmlns="" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:msdata="urn:schemas-microsoft-com:xml-msdata">
+    <xsd:import namespace="http://www.w3.org/XML/1998/namespace" />
+    <xsd:element name="root" msdata:IsDataSet="true">
+      <xsd:complexType>
+        <xsd:choice maxOccurs="unbounded">
+          <xsd:element name="metadata">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" />
+              </xsd:sequence>
+              <xsd:attribute name="name" use="required" type="xsd:string" />
+              <xsd:attribute name="type" type="xsd:string" />
+              <xsd:attribute name="mimetype" type="xsd:string" />
+              <xsd:attribute ref="xml:space" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="assembly">
+            <xsd:complexType>
+              <xsd:attribute name="alias" type="xsd:string" />
+              <xsd:attribute name="name" type="xsd:string" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="data">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+                <xsd:element name="comment" type="xsd:string" minOccurs="0" msdata:Ordinal="2" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" msdata:Ordinal="1" />
+              <xsd:attribute name="type" type="xsd:string" msdata:Ordinal="3" />
+              <xsd:attribute name="mimetype" type="xsd:string" msdata:Ordinal="4" />
+              <xsd:attribute ref="xml:space" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="resheader">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" />
+            </xsd:complexType>
+          </xsd:element>
+        </xsd:choice>
+      </xsd:complexType>
+    </xsd:element>
+  </xsd:schema>
+  <resheader name="resmimetype">
+    <value>text/microsoft-resx</value>
+  </resheader>
+  <resheader name="version">
+    <value>2.0</value>
+  </resheader>
+  <resheader name="reader">
+    <value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <resheader name="writer">
+    <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+
+  <!-- CHN001: Chinese Comment -->
+  <data name="CHN001_Title" xml:space="preserve">
+    <value>Comment contains Chinese characters</value>
+  </data>
+  <data name="CHN001_MessageFormat" xml:space="preserve">
+    <value>Comment content '{0}' contains Chinese characters</value>
+  </data>
+  <data name="CHN001_Description" xml:space="preserve">
+    <value>Comments should not contain Chinese text.</value>
+  </data>
+
+  <!-- DLL002: Missing DllImportSearchPaths -->
+  <data name="DLL002_Title" xml:space="preserve">
+    <value>DllImport missing DefaultDllImportSearchPaths attribute</value>
+  </data>
+  <data name="DLL002_MessageFormat" xml:space="preserve">
+    <value>DllImport does not specify DefaultDllImportSearchPaths attribute</value>
+  </data>
+  <data name="DLL002_Description" xml:space="preserve">
+    <value>When using DllImport, you should specify the DefaultDllImportSearchPaths attribute.</value>
+  </data>
+
+  <!-- DLL003: Unsafe DLL Signature -->
+  <data name="DLL003_Title" xml:space="preserve">
+    <value>Unsafe DLL signature</value>
+  </data>
+  <data name="DLL003_MessageFormat" xml:space="preserve">
+    <value>DLL file '{0}'</value>
+  </data>
+  <data name="DLL003_Description" xml:space="preserve">
+    <value>DLLs referenced via DllImport must have a valid digital signature.</value>
+  </data>
+
+  <!-- EXC001: StackTrace in Catch -->
+  <data name="EXC001_Title" xml:space="preserve">
+    <value>Catch block should not print stack trace</value>
+  </data>
+  <data name="EXC001_MessageFormat" xml:space="preserve">
+    <value>Using {0} to get stack trace in catch block may leak sensitive information</value>
+  </data>
+  <data name="EXC001_Description" xml:space="preserve">
+    <value>When catching exceptions, avoid printing full stack traces. Log only necessary error messages.</value>
+  </data>
+
+  <!-- CODE001: Commented Code -->
+  <data name="CODE001_Title" xml:space="preserve">
+    <value>Comment contains invalid code</value>
+  </data>
+  <data name="CODE001_MessageFormat" xml:space="preserve">
+    <value>Comment contains invalid code: {0}</value>
+  </data>
+  <data name="CODE001_Description" xml:space="preserve">
+    <value>Dead code that has been commented out should not be kept.</value>
+  </data>
+
+  <!-- SEC001: Sensitive Info in Code -->
+  <data name="SEC001_Title" xml:space="preserve">
+    <value>Sensitive information stored in plaintext</value>
+  </data>
+  <data name="SEC001_MessageFormat" xml:space="preserve">
+    <value>Sensitive information detected: {0} = "{1}"</value>
+  </data>
+  <data name="SEC001_Description" xml:space="preserve">
+    <value>Do not store passwords, tokens, keys, or other sensitive information in plaintext. Use configuration files or environment variables.</value>
+  </data>
+
+  <!-- SEC002: Path Traversal -->
+  <data name="SEC002_Title" xml:space="preserve">
+    <value>Uncontrolled search path (path traversal risk)</value>
+  </data>
+  <data name="SEC002_MessageFormat" xml:space="preserve">
+    <value>Uncontrolled search path detected: {0}</value>
+  </data>
+  <data name="SEC002_Description" xml:space="preserve">
+    <value>Never use user input directly as a path. This may lead to path traversal attacks. Validate that paths are within allowed directories.</value>
+  </data>
+
+  <!-- SEC003: SQL Injection -->
+  <data name="SEC003_Title" xml:space="preserve">
+    <value>Potential SQL injection risk</value>
+  </data>
+  <data name="SEC003_MessageFormat" xml:space="preserve">
+    <value>Detected dynamic SQL construction via {0}, SQL injection risk: {1}</value>
+  </data>
+  <data name="SEC003_Description" xml:space="preserve">
+    <value>Do not use string concatenation or interpolation to build SQL statements. Use parameterized queries or ORM frameworks.</value>
+  </data>
+
+  <!-- SEC004: Unsafe Deserialization -->
+  <data name="SEC004_Title" xml:space="preserve">
+    <value>Using unsafe deserialization</value>
+  </data>
+  <data name="SEC004_MessageFormat" xml:space="preserve">
+    <value>Unsafe deserialization detected: {0}, may lead to Remote Code Execution (RCE) vulnerability</value>
+  </data>
+  <data name="SEC004_Description" xml:space="preserve">
+    <value>BinaryFormatter and JavaScriptSerializer have deserialization vulnerabilities. Use System.Text.Json instead. If using Newtonsoft.Json, set TypeNameHandling.None.</value>
+  </data>
+
+  <!-- SEC005: Insecure Random -->
+  <data name="SEC005_Title" xml:space="preserve">
+    <value>Using cryptographically insecure random number generator</value>
+  </data>
+  <data name="SEC005_MessageFormat" xml:space="preserve">
+    <value>Detected use of System.Random {0}, not suitable for security scenarios (tokens, keys). Use RandomNumberGenerator instead</value>
+  </data>
+  <data name="SEC005_Description" xml:space="preserve">
+    <value>System.Random uses pseudo-random algorithm and is not cryptographically secure. For generating tokens, keys, verification codes, and other security-sensitive scenarios, use RandomNumberGenerator.</value>
+  </data>
+
+  <!-- SEC006: ReDoS -->
+  <data name="SEC006_Title" xml:space="preserve">
+    <value>Regex missing timeout parameter (ReDoS risk)</value>
+  </data>
+  <data name="SEC006_MessageFormat" xml:space="preserve">
+    <value>Detected {0} without timeout parameter. Complex regex may lead to Regular expression Denial of Service (ReDoS) attack</value>
+  </data>
+  <data name="SEC006_Description" xml:space="preserve">
+    <value>Always specify matchTimeout parameter when using Regex to prevent DoS attacks caused by exponential backtracking on malicious input.</value>
+  </data>
+
+  <!-- SEC007: Resource Leak -->
+  <data name="SEC007_Title" xml:space="preserve">
+    <value>IDisposable resource not managed with using statement (resource leak risk)</value>
+  </data>
+  <data name="SEC007_MessageFormat" xml:space="preserve">
+    <value>'{0}' implements IDisposable. Use using statement or using declaration to ensure resource disposal</value>
+  </data>
+  <data name="SEC007_Description" xml:space="preserve">
+    <value>Database connections, file streams, HttpClient, and other resources not properly disposed can lead to connection pool exhaustion, file handle leaks, etc.</value>
+  </data>
+
+  <!-- SEC008: Insecure Temp File -->
+  <data name="SEC008_Title" xml:space="preserve">
+    <value>Using predictable temp file name (race condition/file enumeration risk)</value>
+  </data>
+  <data name="SEC008_MessageFormat" xml:space="preserve">
+    <value>Detected predictable temp file name construction ({0}). Attacker can predict file path for race condition or symlink attacks</value>
+  </data>
+  <data name="SEC008_Description" xml:space="preserve">
+    <value>Use Path.GetTempFileName() or Path.Combine(Path.GetTempPath(), Path.GetRandomFileName()) to generate unpredictable temp file names.</value>
+  </data>
+
+  <!-- DLL Signature Messages -->
+  <data name="DLL003_UnknownDll" xml:space="preserve">
+    <value>Unknown DLL name</value>
+  </data>
+  <data name="DLL003_NotFoundInPath" xml:space="preserve">
+    <value>{0} (not found in specified search path)</value>
+  </data>
+  <data name="DLL003_InvalidSignature" xml:space="preserve">
+    <value>{0} (invalid/unsigned signature)</value>
+  </data>
+
+</root>

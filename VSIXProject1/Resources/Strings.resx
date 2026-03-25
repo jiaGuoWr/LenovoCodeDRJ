@@ -1,0 +1,156 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <xsd:schema id="root" xmlns="" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:msdata="urn:schemas-microsoft-com:xml-msdata">
+    <xsd:import namespace="http://www.w3.org/XML/1998/namespace" />
+    <xsd:element name="root" msdata:IsDataSet="true">
+      <xsd:complexType>
+        <xsd:choice maxOccurs="unbounded">
+          <xsd:element name="metadata">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" />
+              </xsd:sequence>
+              <xsd:attribute name="name" use="required" type="xsd:string" />
+              <xsd:attribute name="type" type="xsd:string" />
+              <xsd:attribute name="mimetype" type="xsd:string" />
+              <xsd:attribute ref="xml:space" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="assembly">
+            <xsd:complexType>
+              <xsd:attribute name="alias" type="xsd:string" />
+              <xsd:attribute name="name" type="xsd:string" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="data">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+                <xsd:element name="comment" type="xsd:string" minOccurs="0" msdata:Ordinal="2" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" msdata:Ordinal="1" />
+              <xsd:attribute name="type" type="xsd:string" msdata:Ordinal="3" />
+              <xsd:attribute name="mimetype" type="xsd:string" msdata:Ordinal="4" />
+              <xsd:attribute ref="xml:space" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="resheader">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" />
+            </xsd:complexType>
+          </xsd:element>
+        </xsd:choice>
+      </xsd:complexType>
+    </xsd:element>
+  </xsd:schema>
+  <resheader name="resmimetype">
+    <value>text/microsoft-resx</value>
+  </resheader>
+  <resheader name="version">
+    <value>2.0</value>
+  </resheader>
+  <resheader name="reader">
+    <value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <resheader name="writer">
+    <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+
+  <!-- Tool Window Title -->
+  <data name="ToolWindow_Title" xml:space="preserve">
+    <value>代码问题汇总</value>
+  </data>
+
+  <!-- Git Status -->
+  <data name="Status_GitConnected" xml:space="preserve">
+    <value>Git: 已连接</value>
+  </data>
+  <data name="Status_GitNotDetected" xml:space="preserve">
+    <value>Git: 未检测到</value>
+  </data>
+  <data name="Status_Branch" xml:space="preserve">
+    <value>分支: {0}</value>
+  </data>
+  <data name="Status_BranchNone" xml:space="preserve">
+    <value>分支: -</value>
+  </data>
+  <data name="Status_Changes" xml:space="preserve">
+    <value>更改: {0}</value>
+  </data>
+
+  <!-- Analysis Mode -->
+  <data name="Status_ModeIncremental" xml:space="preserve">
+    <value>模式: 增量</value>
+  </data>
+  <data name="Status_ModeFull" xml:space="preserve">
+    <value>模式: 全量</value>
+  </data>
+  <data name="Status_ModeNone" xml:space="preserve">
+    <value>模式: -</value>
+  </data>
+
+  <!-- Buttons -->
+  <data name="Button_ToggleMode" xml:space="preserve">
+    <value>切换模式</value>
+  </data>
+  <data name="Button_OK" xml:space="preserve">
+    <value>确定</value>
+  </data>
+  <data name="Button_Cancel" xml:space="preserve">
+    <value>取消</value>
+  </data>
+
+  <!-- Messages -->
+  <data name="Message_NoIssues" xml:space="preserve">
+    <value>未检测到代码问题</value>
+  </data>
+  <data name="Message_Analyzing" xml:space="preserve">
+    <value>分析中... ({0}/{1}) {2}</value>
+  </data>
+  <data name="Message_LineNumber" xml:space="preserve">
+    <value>[行 {0}]</value>
+  </data>
+  <data name="Message_UnknownFile" xml:space="preserve">
+    <value>未知文件</value>
+  </data>
+
+  <!-- Language Settings Dialog -->
+  <data name="Dialog_LanguageTitle" xml:space="preserve">
+    <value>语言设置</value>
+  </data>
+  <data name="Dialog_SelectLanguage" xml:space="preserve">
+    <value>选择语言:</value>
+  </data>
+  <data name="Dialog_ShortcutHint" xml:space="preserve">
+    <value>快捷键: Ctrl+Shift+L</value>
+  </data>
+  <data name="Dialog_RestartHint" xml:space="preserve">
+    <value>语言更改将立即生效</value>
+  </data>
+
+  <!-- Menu Commands -->
+  <data name="Menu_CodeIssueSummary" xml:space="preserve">
+    <value>代码问题汇总</value>
+  </data>
+  <data name="Menu_LanguageSettings" xml:space="preserve">
+    <value>语言设置</value>
+  </data>
+
+  <!-- Debug Messages -->
+  <data name="Debug_StartUpdate" xml:space="preserve">
+    <value>开始更新分析结果</value>
+  </data>
+  <data name="Debug_DiagnosticsNull" xml:space="preserve">
+    <value>UpdateAnalysisResults: diagnostics 为空</value>
+  </data>
+  <data name="Debug_RestoreError" xml:space="preserve">
+    <value>恢复工具窗口状态时出错: {0}</value>
+  </data>
+  <data name="Debug_NavigateError" xml:space="preserve">
+    <value>导航到错误位置时出错: {0}</value>
+  </data>
+
+</root>

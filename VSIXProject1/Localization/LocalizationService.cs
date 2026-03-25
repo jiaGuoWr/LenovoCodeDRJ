@@ -55,6 +55,7 @@ namespace VSIXProject1.Localization
                     _currentLanguage = value;
                     UpdateCulture();
                     LanguageChanged?.Invoke(null, EventArgs.Empty);
+                    TranslationProvider.Instance.Refresh();
                 }
             }
         }
@@ -204,12 +205,14 @@ namespace VSIXProject1.Localization
         /// </summary>
         public static CultureInfo GetCultureInfo(SupportedLanguage language)
         {
-            return language switch
+            switch (language)
             {
-                SupportedLanguage.English => new CultureInfo("en-US"),
-                SupportedLanguage.ChineseSimplified => new CultureInfo("zh-CN"),
-                _ => new CultureInfo("zh-CN")
-            };
+                case SupportedLanguage.English:
+                    return new CultureInfo("en-US");
+                case SupportedLanguage.ChineseSimplified:
+                default:
+                    return new CultureInfo("zh-CN");
+            }
         }
 
         /// <summary>
@@ -217,12 +220,14 @@ namespace VSIXProject1.Localization
         /// </summary>
         public static string GetLanguageDisplayName(SupportedLanguage language)
         {
-            return language switch
+            switch (language)
             {
-                SupportedLanguage.ChineseSimplified => "简体中文 (Chinese Simplified)",
-                SupportedLanguage.English => "English",
-                _ => "简体中文 (Chinese Simplified)"
-            };
+                case SupportedLanguage.English:
+                    return "English";
+                case SupportedLanguage.ChineseSimplified:
+                default:
+                    return "简体中文 (Chinese Simplified)";
+            }
         }
 
         private static void UpdateCulture()

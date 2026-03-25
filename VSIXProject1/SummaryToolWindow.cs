@@ -6,11 +6,27 @@ using System.Text;
 using System.Threading.Tasks;
 using Microsoft.CodeAnalysis;
 using Microsoft.VisualStudio.Threading;
+using System.Runtime.InteropServices;
+using System.Windows.Interop;
+using VSIXProject1.Localization;
+using System.Windows;
 
 namespace VSIXProject1
 {
     public class SummaryToolWindow : ToolWindowPane, IDisposable
     {
+        private const int HotKeyId = 0x2301;
+        private const int WmHotKey = 0x0312;
+        private const uint ModAlt = 0x0001;
+        private const uint ModControl = 0x0002;
+        private const uint VkL = 0x4C;
+
+        [DllImport("user32.dll", SetLastError = true)]
+        private static extern bool RegisterHotKey(IntPtr hWnd, int id, uint fsModifiers, uint vk);
+
+        [DllImport("user32.dll", SetLastError = true)]
+        private static extern bool UnregisterHotKey(IntPtr hWnd, int id);
+
         public SummaryWindowControl Control {
             get { return (SummaryWindowControl)this.Content; }
         }
@@ -29,15 +45,18 @@ namespace VSIXProject1
         private bool _isInstanceInitializedSubscribed = false;
         private bool _isGitRepositoryChangedSubscribed = false;
         private bool _isDisposed = false;
+        private HwndSource _hwndSource;
+        private bool _isHotKeyRegistered;
 
         public SummaryToolWindow() : base(null)
         {
-            this.Caption = "代码问题汇总";
+            this.Caption = LocalizationService.GetString("ToolWindow_Title");
             this.Content = new SummaryWindowControl();
             Control.RefreshRequested += Control_RefreshRequested;
             // 注册 MyToolWindowCommand 实例初始化完成事件
             MyToolWindowCommand.InstanceInitialized += MyToolWindowCommand_InstanceInitialized;
             _isInstanceInitializedSubscribed = true;
+            LocalizationService.LanguageChanged += OnLanguageChanged;
         }
 
         public SummaryToolWindow(AsyncPackage package) : this()
@@ -58,11 +77,80 @@ namespace VSIXProject1
             {
                 System.Diagnostics.Debug.WriteLine("OnToolWindowCreated: 初始化控件");
                 Control.Initialize(package);
+                Control.Loaded += Control_Loaded;
+                Control.Unloaded += Control_Unloaded;
                 // 注册 RefreshRequested 事件的处理器
                 RefreshRequested += SummaryToolWindow_RefreshRequested;
                 // 窗口显示时检查并执行代码分析，确保显示最新结果
                 CheckAndExecuteAnalysis();
             }
+        }
+
+        private void Control_Loaded(object sender, System.Windows.RoutedEventArgs e)
+        {
+            EnsureHotKeyRegistered();
+        }
+
+        private void Control_Unloaded(object sender, System.Windows.RoutedEventArgs e)
+        {
+            UnregisterSystemHotKey();
+        }
+
+        private void EnsureHotKeyRegistered()
+        {
+            try
+            {
+                if (_isHotKeyRegistered)
+                {
+                    return;
+                }
+
+                _hwndSource = PresentationSource.FromVisual(Control) as HwndSource;
+                if (_hwndSource == null || _hwndSource.Handle == IntPtr.Zero)
+                {
+                    return;
+                }
+
+                _hwndSource.AddHook(WndProc);
+                _isHotKeyRegistered = RegisterHotKey(_hwndSource.Handle, HotKeyId, ModControl | ModAlt, VkL);
+                System.Diagnostics.Debug.WriteLine($"SummaryToolWindow: RegisterHotKey result={_isHotKeyRegistered}");
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"EnsureHotKeyRegistered 错误: {ex.Message}");
+            }
+        }
+
+        private void UnregisterSystemHotKey()
+        {
+            try
+            {
+                if (_hwndSource != null)
+                {
+                    if (_isHotKeyRegistered)
+                    {
+                        UnregisterHotKey(_hwndSource.Handle, HotKeyId);
+                        _isHotKeyRegistered = false;
+                    }
+                    _hwndSource.RemoveHook(WndProc);
+                    _hwndSource = null;
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"UnregisterSystemHotKey 错误: {ex.Message}");
+            }
+        }
+
+        private IntPtr WndProc(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
+        {
+            if (msg == WmHotKey && wParam.ToInt32() == HotKeyId)
+            {
+                handled = true;
+                Control.ShowLanguageSelectionDialog();
+            }
+
+            return IntPtr.Zero;
         }
 
         // RefreshRequested 事件处理程序
@@ -74,43 +162,8 @@ namespace VSIXProject1
 
         private void ExecuteCodeAnalysis()
         {
-            AsyncPackage package = _package ?? (Package as AsyncPackage);
-            System.Diagnostics.Debug.WriteLine($"ExecuteCodeAnalysis 开始执行，package: {package != null}");
-            if (package != null)
-            {
-                System.Diagnostics.Debug.WriteLine($"ExecuteCodeAnalysis: MyToolWindowCommand.Instance: {MyToolWindowCommand.Instance != null}");
-                package.JoinableTaskFactory.RunAsync(async () =>
-                {
-                    try
-                    {
-                        // 检查MyToolWindowCommand.Instance是否已经初始化
-                        if (MyToolWindowCommand.Instance != null)
-                        {
-                            System.Diagnostics.Debug.WriteLine("ExecuteCodeAnalysis: 开始执行代码分析");
-                            // 执行代码分析
-                            var diagnostics = await MyToolWindowCommand.Instance.AnalyzeSolutionAsync();
-                            System.Diagnostics.Debug.WriteLine($"ExecuteCodeAnalysis: 代码分析完成，发现 {diagnostics.Count()} 个问题");
-                            // 更新工具窗口显示
-                            await UpdateAnalysisResultsAsync(diagnostics);
-                            System.Diagnostics.Debug.WriteLine("ExecuteCodeAnalysis: 工具窗口显示更新完成");
-                        }
-                        else
-                        {
-                            System.Diagnostics.Debug.WriteLine("ExecuteCodeAnalysis: MyToolWindowCommand.Instance 为 null");
-                        }
-                    }
-                    catch (Exception ex)
-                    {
-                        // 处理异常
-                        System.Diagnostics.Debug.WriteLine($"执行代码分析时出错: {ex.Message}");
-                        System.Diagnostics.Debug.WriteLine($"异常堆栈: {ex.StackTrace}");
-                    }
-                });
-            }
-            else
-            {
-                System.Diagnostics.Debug.WriteLine("ExecuteCodeAnalysis: package 为 null");
-            }
+            System.Diagnostics.Debug.WriteLine("ExecuteCodeAnalysis: 通过防抖请求执行代码分析");
+            MyToolWindowCommand.Instance?.RequestAnalysisRefresh();
         }
 
         private void Control_RefreshRequested(object sender, EventArgs e)
@@ -148,6 +201,11 @@ namespace VSIXProject1
                 _isGitRepositoryChangedSubscribed = true;
                 System.Diagnostics.Debug.WriteLine("SummaryToolWindow: 已订阅 GitRepositoryChanged 事件");
             }
+        }
+
+        private void OnLanguageChanged(object sender, EventArgs e)
+        {
+            this.Caption = LocalizationService.GetString("ToolWindow_Title");
         }
 
         // Git 仓库变化事件处理程序
@@ -261,6 +319,8 @@ namespace VSIXProject1
                 System.Diagnostics.Debug.WriteLine("SummaryToolWindow: 已取消订阅 InstanceInitialized 事件");
             }
 
+            LocalizationService.LanguageChanged -= OnLanguageChanged;
+
             // 取消订阅 GitRepositoryChanged 事件
             if (_isGitRepositoryChangedSubscribed && MyToolWindowCommand.Instance != null)
             {
@@ -273,7 +333,11 @@ namespace VSIXProject1
             if (Control != null)
             {
                 Control.RefreshRequested -= Control_RefreshRequested;
+                Control.Loaded -= Control_Loaded;
+                Control.Unloaded -= Control_Unloaded;
             }
+
+            UnregisterSystemHotKey();
 
             // 取消订阅 RefreshRequested 事件
             RefreshRequested -= SummaryToolWindow_RefreshRequested;

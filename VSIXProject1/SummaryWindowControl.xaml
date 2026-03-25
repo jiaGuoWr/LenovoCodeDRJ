@@ -3,12 +3,13 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vs="clr-namespace:Microsoft.VisualStudio.PlatformUI;assembly=Microsoft.VisualStudio.Shell.15.0"
              xmlns:shell="clr-namespace:Microsoft.VisualStudio.Shell;assembly=Microsoft.VisualStudio.Shell.15.0"
+             xmlns:loc="clr-namespace:VSIXProject1.Localization"
              Background="{DynamicResource {x:Static vs:EnvironmentColors.ToolWindowBackgroundBrushKey}}"
              Foreground="{DynamicResource {x:Static vs:EnvironmentColors.ToolWindowTextBrushKey}}">
     <Grid>
         <!-- 标题栏 -->
         <Grid Background="{DynamicResource {x:Static vs:EnvironmentColors.CommandBarMenuBackgroundGradientBrushKey}}" Height="28">
-            <TextBlock Text="代码问题汇总" FontSize="12" FontWeight="Medium" Margin="8,6,0,0"
+            <TextBlock Text="{Binding [ToolWindow_Title], Source={x:Static loc:TranslationProvider.Instance}}" FontSize="12" FontWeight="Medium" Margin="8,6,0,0"
                        Foreground="{DynamicResource {x:Static vs:EnvironmentColors.ToolWindowTextBrushKey}}"/>
         </Grid>
         
@@ -38,7 +39,7 @@
             <TextBlock x:Name="ProgressText" Grid.Column="4" FontSize="10" Margin="8,4,8,4"
                        Visibility="Collapsed"
                        Foreground="{DynamicResource {x:Static vs:EnvironmentColors.ToolWindowTextBrushKey}}"/>
-            <Button x:Name="ToggleModeButton" Grid.Column="5" Content="切换模式" FontSize="10" Height="20" Margin="0,2,8,2"
+            <Button x:Name="ToggleModeButton" Grid.Column="5" Content="{Binding [Button_ToggleMode], Source={x:Static loc:TranslationProvider.Instance}}" FontSize="10" Height="20" Margin="0,2,8,2"
                     Background="{DynamicResource {x:Static vs:EnvironmentColors.CommandBarMouseOverBackgroundGradientBrushKey}}"
                     Foreground="{DynamicResource {x:Static vs:EnvironmentColors.ToolWindowTextBrushKey}}"
                     BorderThickness="0" Click="ToggleModeButton_Click"/>

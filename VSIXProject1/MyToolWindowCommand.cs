@@ -17,6 +17,7 @@ using Microsoft.VisualStudio;
 using LenovoAnalyzer;
 using System.Runtime.InteropServices;
 using System.Diagnostics;
+using VSIXProject1.Localization;
 
 namespace VSIXProject1
 {
@@ -142,6 +143,9 @@ namespace VSIXProject1
         private System.Threading.Timer _debounceTimer;
         private readonly object _debounceLock = new object();
         private const int DEBOUNCE_DELAY_MS = 1000; // 1秒防抖延迟
+        private readonly SemaphoreSlim _refreshExecutionGate = new SemaphoreSlim(1, 1);
+        private CancellationTokenSource _refreshAnalysisCts;
+        private int _pendingRefreshRequests = 0;
 
         // 最大文件大小限制 (10MB)
         private const long MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024;
@@ -187,6 +191,7 @@ namespace VSIXProject1
         public static async Task InitializeAsync(AsyncPackage package)
         {
             await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync(package.DisposalToken);
+            LocalizationService.Initialize(package);
             OleMenuCommandService commandService = await package.GetServiceAsync(typeof(IMenuCommandService)) as OleMenuCommandService;
             Instance = new MyToolWindowCommand(package, commandService);
             
@@ -283,8 +288,7 @@ namespace VSIXProject1
                         // 确保控件被初始化
                         summaryWindow.Control.Initialize(package);
                         await summaryWindow.UpdateAnalysisResultsAsync(diagnostics);
-                        // 注册刷新事件
-                        summaryWindow.RefreshRequested += SummaryWindow_RefreshRequested;
+                        // 注意：此处不再注册刷新事件，由 SummaryToolWindow 内部触发防抖请求
                     }
 
                     IVsWindowFrame windowFrame = (IVsWindowFrame)window.Frame;
@@ -303,24 +307,62 @@ namespace VSIXProject1
             });
         }
 
-        private void SummaryWindow_RefreshRequested(object sender, EventArgs e)
+        public void RequestAnalysisRefresh()
         {
             // 使用防抖机制，延迟执行分析
             lock (_debounceLock)
             {
                 _debounceTimer?.Dispose();
-                _debounceTimer = new System.Threading.Timer(async _ =>
+                _debounceTimer = new System.Threading.Timer(_ =>
                 {
-                    await ExecuteRefreshWithDebounceAsync(sender);
+                    ThreadHelper.JoinableTaskFactory.RunAsync(async () =>
+                    {
+                        await QueueDebouncedRefreshAsync();
+                    });
                 }, null, DEBOUNCE_DELAY_MS, Timeout.Infinite);
             }
         }
 
-        private async Task ExecuteRefreshWithDebounceAsync(object sender)
+        private async Task QueueDebouncedRefreshAsync()
+        {
+            Interlocked.Increment(ref _pendingRefreshRequests);
+
+            if (!await _refreshExecutionGate.WaitAsync(0))
+            {
+                // 已有刷新任务在执行，当前请求仅标记为 pending，由正在运行的循环合并处理
+                return;
+            }
+
+            try
+            {
+                while (Interlocked.Exchange(ref _pendingRefreshRequests, 0) > 0)
+                {
+                    CancellationTokenSource currentCts = null;
+                    lock (_debounceLock)
+                    {
+                        _refreshAnalysisCts?.Cancel();
+                        _refreshAnalysisCts?.Dispose();
+                        _refreshAnalysisCts = CancellationTokenSource.CreateLinkedTokenSource(package.DisposalToken);
+                        currentCts = _refreshAnalysisCts;
+                    }
+
+                    await ExecuteRefreshWithDebounceAsync(currentCts.Token);
+                }
+            }
+            finally
+            {
+                _refreshExecutionGate.Release();
+            }
+        }
+
+        private async Task ExecuteRefreshWithDebounceAsync(CancellationToken cancellationToken)
         {
             try
             {
+                cancellationToken.ThrowIfCancellationRequested();
+
                 // 获取当前打开的解决方案
+                await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync(cancellationToken);
                 IVsSolution solution = package.GetService<SVsSolution, IVsSolution>();
                 if (solution == null)
                 {
@@ -332,6 +374,9 @@ namespace VSIXProject1
                 string solutionPath = string.Empty;
                 solution.GetSolutionInfo(out solutionPath, out _, out _);
                 Debug.WriteLine($"ExecuteRefreshWithDebounceAsync: solutionPath={solutionPath}");
+
+                // 再次切回后台线程，避免阻塞 UI
+                await TaskScheduler.Default;
 
                 // 检查是否为 Git 仓库
                 bool isGitRepository = GitHelper.Instance.IsGitRepository(solutionPath);
@@ -351,31 +396,16 @@ namespace VSIXProject1
                     }
                 }
 
-                // 创建进度报告器
-                var progress = new Progress<AnalysisProgress>(async p =>
-                {
-                    if (sender is SummaryToolWindow sw)
-                    {
-                        if (p.IsCompleted)
-                        {
-                            await sw.Control.HideProgressAsync();
-                        }
-                        else
-                        {
-                            await sw.Control.ShowProgressAsync(p.CompletedFiles, p.TotalFiles, p.CurrentFile);
-                        }
-                    }
-                });
-
-                // 执行代码分析
-                var diagnostics = await AnalyzeSolutionAsync(progress);
+                // 保存/自动刷新路径默认禁用逐文件进度UI，避免大文件保存后主线程频繁刷新导致卡顿
+                var diagnostics = await AnalyzeSolutionAsync(progress: null, cancellationToken: cancellationToken);
 
                 // 调试：打印诊断信息数量和类型
                 Debug.WriteLine($"分析完成，共发现 {diagnostics.Count()} 个问题");
 
                 // 更新工具窗口显示（切换到UI线程）
-                await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
-                if (sender is SummaryToolWindow summaryWindow)
+                await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync(cancellationToken);
+                var window = package.FindToolWindow(typeof(SummaryToolWindow), 0, false);
+                if (window is SummaryToolWindow summaryWindow)
                 {
                     // 隐藏进度条
                     await summaryWindow.Control.HideProgressAsync();
@@ -383,6 +413,10 @@ namespace VSIXProject1
                     summaryWindow.Control.Initialize(package);
                     await summaryWindow.UpdateAnalysisResultsAsync(diagnostics);
                 }
+            }
+            catch (OperationCanceledException)
+            {
+                Debug.WriteLine("ExecuteRefreshWithDebounceAsync: 刷新分析已取消（收到更新请求或窗口关闭）");
             }
             catch (Exception ex)
             {
@@ -409,7 +443,8 @@ namespace VSIXProject1
 
             try
             {
-                // 获取当前打开的解决方案
+                // 获取当前打开的解决方案前切到UI线程
+                await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync(cancellationToken);
                 IVsSolution solution = package.GetService<SVsSolution, IVsSolution>();
                 if (solution == null)
                 {
@@ -421,6 +456,9 @@ namespace VSIXProject1
                 string solutionPath = string.Empty;
                 solution.GetSolutionInfo(out solutionPath, out _, out _);
                 System.Diagnostics.Debug.WriteLine($"AnalyzeSolutionAsync: solutionPath={solutionPath}");
+
+                // 获取方案后，切到后台线程，避免阻塞UI线程导致卡顿
+                await TaskScheduler.Default;
 
                 // 检查是否为 Git 仓库
                 bool isGitRepository = GitHelper.Instance.IsGitRepository(solutionPath);
@@ -955,62 +993,8 @@ namespace VSIXProject1
                     // 触发 Git 仓库变化事件
                     GitRepositoryChanged?.Invoke(this, EventArgs.Empty);
 
-                    // 自动重新分析
-                    package.JoinableTaskFactory.RunAsync(async () =>
-                    {
-                        try
-                        {
-                            // 尝试获取已存在的工具窗口
-                            var window = package.FindToolWindow(typeof(SummaryToolWindow), 0, false);
-                            
-                            if (window is SummaryToolWindow summaryWindow)
-                            {
-                                // 创建进度报告器
-                                var progress = new Progress<AnalysisProgress>(async p =>
-                                {
-                                    if (p.IsCompleted)
-                                    {
-                                        await summaryWindow.Control.HideProgressAsync();
-                                    }
-                                    else
-                                    {
-                                        await summaryWindow.Control.ShowProgressAsync(p.CompletedFiles, p.TotalFiles, p.CurrentFile);
-                                    }
-                                });
-
-                                // 执行分析
-                                var diagnostics = await AnalyzeSolutionAsync(progress);
-                                System.Diagnostics.Debug.WriteLine($"分析完成，诊断数量: {diagnostics.Count()}");
-
-                                // 确保在UI线程上更新
-                                await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
-
-                                // 隐藏进度条
-                                await summaryWindow.Control.HideProgressAsync();
-
-                                if (diagnostics.Count() == 0)
-                                {
-                                    System.Diagnostics.Debug.WriteLine("Git 事件触发，分析结果为空，清空UI");
-                                    summaryWindow.ClearResults();
-                                }
-                                else
-                                {
-                                    System.Diagnostics.Debug.WriteLine("Git 事件触发，分析结果不为空，更新UI");
-                                    await summaryWindow.UpdateAnalysisResultsAsync(diagnostics);
-                                }
-                                System.Diagnostics.Debug.WriteLine("UI更新完成");
-                            }
-                            else
-                            {
-                                System.Diagnostics.Debug.WriteLine("工具窗口未打开，不更新");
-                            }
-                        }
-                        catch (Exception ex)
-                        {
-                            System.Diagnostics.Debug.WriteLine($"文件变化时自动分析错误: {ex.Message}");
-                            System.Diagnostics.Debug.WriteLine($"异常堆栈: {ex.StackTrace}");
-                        }
-                    });
+                    // 自动重新分析（通过防抖触发）
+                    RequestAnalysisRefresh();
                 });
 
                 System.Diagnostics.Debug.WriteLine("Git 事件监听已启动");

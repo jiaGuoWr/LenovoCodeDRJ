@@ -20,6 +20,7 @@ using Microsoft.VisualStudio.Threading;
 using Microsoft.VisualStudio.PlatformUI;
 using System.Diagnostics;
 using System.Windows.Threading;
+using VSIXProject1.Localization;
 
 namespace VSIXProject1
 {
@@ -35,7 +36,10 @@ namespace VSIXProject1
 
         // 延迟分析定时器 - 用于保存后防抖
         private DispatcherTimer _analysisDelayTimer;
-        private const int ANALYSIS_DELAY_MS = 1000; // 1秒延迟
+        // 保存后触发分析使用更保守延迟，优先保证编辑器流畅性，尤其是大文件保存场景
+        private const int ANALYSIS_DELAY_MS = 2500;
+        private bool _isLanguageChangedSubscribed;
+        private List<Diagnostic> _latestDiagnostics = new List<Diagnostic>();
 
         public SummaryWindowControl()
         {
@@ -58,9 +62,46 @@ namespace VSIXProject1
             if (_package != package)
             {
                 _package = package;
+                LocalizationService.Initialize(package);
                 InitializeEventHandlers();
+                SubscribeLanguageChanged();
                 // 注册双击事件已在 XAML 中绑定到 DiagnosticsTree_MouseDoubleClick
             }
+        }
+
+        private void SubscribeLanguageChanged()
+        {
+            if (_isLanguageChangedSubscribed)
+            {
+                return;
+            }
+
+            LocalizationService.LanguageChanged += OnLanguageChanged;
+            _isLanguageChangedSubscribed = true;
+        }
+
+        private void OnLanguageChanged(object sender, EventArgs e)
+        {
+            ThreadHelper.JoinableTaskFactory.RunAsync(async () =>
+            {
+                await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
+                GetParentToolWindow()?.UpdateGitStatus();
+                await UpdateAnalysisResultsAsync(_latestDiagnostics);
+            });
+        }
+
+        private string GetLineLabel(int line)
+        {
+            return LocalizationService.CurrentLanguage == SupportedLanguage.English
+                ? $"[Line {line}]"
+                : $"[行 {line}]";
+        }
+
+        private string GetUnknownFileText()
+        {
+            return LocalizationService.CurrentLanguage == SupportedLanguage.English
+                ? "Unknown file"
+                : "未知文件";
         }
 
         private void InitializeEventHandlers()
@@ -260,11 +301,11 @@ namespace VSIXProject1
             Debug.WriteLine("开始更新分析结果");
             DiagnosticsTree.Items.Clear();
             _diagnosticMap.Clear();
+            _latestDiagnostics = diagnostics?.ToList() ?? new List<Diagnostic>();
 
             if (diagnostics == null)
             {
                 Debug.WriteLine("UpdateAnalysisResults: diagnostics 为空");
-                DiagnosticsTree.Items.Add(new TreeViewItem { Header = "未检测到代码问题" });
                 return;
             }
 
@@ -279,7 +320,6 @@ namespace VSIXProject1
 
             if (uniqueDiagnostics.Count == 0)
             {
-                DiagnosticsTree.Items.Add(new TreeViewItem { Header = "未检测到代码问题" });
                 return;
             }
 
@@ -293,11 +333,11 @@ namespace VSIXProject1
                     try
                     {
                         var path = d.Location?.GetLineSpan().Path;
-                        return string.IsNullOrEmpty(path) ? "未知文件" : path;
+                        return string.IsNullOrEmpty(path) ? GetUnknownFileText() : path;
                     }
                     catch
                     {
-                        return "未知文件";
+                        return GetUnknownFileText();
                     }
                 })
                 .OrderBy(g => g.Key)
@@ -329,11 +369,13 @@ namespace VSIXProject1
                     {
                         var lineSpan = diagnostic.Location.GetLineSpan();
                         int line = lineSpan.StartLinePosition.Line + 1;
+                        string lineLabel = GetLineLabel(line);
+                        string localizedMessage = DiagnosticMessageLocalizer.GetDisplayMessage(diagnostic);
 
                         // 创建带颜色区分的诊断项文本
                         var itemText = new TextBlock
                         {
-                            Text = $"[行 {line}] {diagnostic.Id}: {diagnostic.GetMessage()}",
+                            Text = $"{lineLabel} {diagnostic.Id}: {localizedMessage}",
                             Foreground = GetDiagnosticItemBrush()
                         };
 
@@ -475,7 +517,6 @@ namespace VSIXProject1
             ThreadHelper.ThrowIfNotOnUIThread();
             DiagnosticsTree.Items.Clear();
             _diagnosticMap.Clear();
-            DiagnosticsTree.Items.Add(new TreeViewItem { Header = "未检测到代码问题" });
         }
 
         // 更新 Git 状态显示
@@ -486,19 +527,25 @@ namespace VSIXProject1
             try
             {
                 // 更新 Git 状态
-                GitStatusText.Text = isGitRepository ? "Git: 已连接" : "Git: 未检测到";
-                BranchText.Text = isGitRepository && !string.IsNullOrEmpty(branch) ? $"分支: {branch}" : "分支: -";
-                ChangedFilesText.Text = isGitRepository ? $"更改: {changedFilesCount}" : "更改: 0";
+                GitStatusText.Text = isGitRepository
+                    ? LocalizationService.GetString("Status_GitConnected")
+                    : LocalizationService.GetString("Status_GitNotDetected");
+                BranchText.Text = isGitRepository && !string.IsNullOrEmpty(branch)
+                    ? LocalizationService.GetString("Status_Branch", branch)
+                    : LocalizationService.GetString("Status_BranchNone");
+                ChangedFilesText.Text = LocalizationService.GetString("Status_Changes", isGitRepository ? changedFilesCount : 0);
 
                 // 更新分析模式
                 var toolWindow = GetParentToolWindow();
                 if (toolWindow != null)
                 {
-                    AnalysisModeText.Text = toolWindow.IsIncrementalAnalysisMode ? "模式: 增量" : "模式: 全量";
+                    AnalysisModeText.Text = toolWindow.IsIncrementalAnalysisMode
+                        ? LocalizationService.GetString("Status_ModeIncremental")
+                        : LocalizationService.GetString("Status_ModeFull");
                 }
                 else
                 {
-                    AnalysisModeText.Text = "模式: -";
+                    AnalysisModeText.Text = LocalizationService.GetString("Status_ModeNone");
                 }
             }
             catch (Exception ex)
@@ -521,6 +568,30 @@ namespace VSIXProject1
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"ToggleModeButton_Click 错误: {ex.Message}");
+            }
+        }
+
+        public void ShowLanguageSelectionDialog()
+        {
+            try
+            {
+                if (_package == null)
+                {
+                    return;
+                }
+                var dialog = new LanguageSelectDialog(LocalizationService.CurrentLanguage)
+                {
+                    Owner = Window.GetWindow(this)
+                };
+                bool? result = dialog.ShowDialog();
+                if (result == true)
+                {
+                    LocalizationService.SetLanguage(dialog.SelectedLanguage, _package);
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"ShowLanguageSelectionDialog 错误: {ex.Message}");
             }
         }
 

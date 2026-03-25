@@ -48,6 +48,12 @@
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="GitHelper.cs" />
+    <Compile Include="Localization\DiagnosticMessageLocalizer.cs" />
+    <Compile Include="Localization\LanguageSelectDialog.xaml.cs">
+      <DependentUpon>LanguageSelectDialog.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="Localization\LocalizationService.cs" />
+    <Compile Include="Localization\TranslationProvider.cs" />
     <Compile Include="MyToolWindowCommand.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="SharpGitHelper.cs" />
@@ -99,6 +105,10 @@
     <PackageReference Include="SharpGit" Version="0.26.0" />
   </ItemGroup>
   <ItemGroup>
+    <Page Include="Localization\LanguageSelectDialog.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
     <Page Include="SummaryWindowControl.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>

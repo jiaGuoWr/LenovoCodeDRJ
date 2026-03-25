@@ -1,0 +1,156 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <xsd:schema id="root" xmlns="" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:msdata="urn:schemas-microsoft-com:xml-msdata">
+    <xsd:import namespace="http://www.w3.org/XML/1998/namespace" />
+    <xsd:element name="root" msdata:IsDataSet="true">
+      <xsd:complexType>
+        <xsd:choice maxOccurs="unbounded">
+          <xsd:element name="metadata">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" />
+              </xsd:sequence>
+              <xsd:attribute name="name" use="required" type="xsd:string" />
+              <xsd:attribute name="type" type="xsd:string" />
+              <xsd:attribute name="mimetype" type="xsd:string" />
+              <xsd:attribute ref="xml:space" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="assembly">
+            <xsd:complexType>
+              <xsd:attribute name="alias" type="xsd:string" />
+              <xsd:attribute name="name" type="xsd:string" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="data">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+                <xsd:element name="comment" type="xsd:string" minOccurs="0" msdata:Ordinal="2" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" msdata:Ordinal="1" />
+              <xsd:attribute name="type" type="xsd:string" msdata:Ordinal="3" />
+              <xsd:attribute name="mimetype" type="xsd:string" msdata:Ordinal="4" />
+              <xsd:attribute ref="xml:space" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="resheader">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" />
+            </xsd:complexType>
+          </xsd:element>
+        </xsd:choice>
+      </xsd:complexType>
+    </xsd:element>
+  </xsd:schema>
+  <resheader name="resmimetype">
+    <value>text/microsoft-resx</value>
+  </resheader>
+  <resheader name="version">
+    <value>2.0</value>
+  </resheader>
+  <resheader name="reader">
+    <value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <resheader name="writer">
+    <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+
+  <!-- Tool Window Title -->
+  <data name="ToolWindow_Title" xml:space="preserve">
+    <value>Code Issue Summary</value>
+  </data>
+
+  <!-- Git Status -->
+  <data name="Status_GitConnected" xml:space="preserve">
+    <value>Git: Connected</value>
+  </data>
+  <data name="Status_GitNotDetected" xml:space="preserve">
+    <value>Git: Not Detected</value>
+  </data>
+  <data name="Status_Branch" xml:space="preserve">
+    <value>Branch: {0}</value>
+  </data>
+  <data name="Status_BranchNone" xml:space="preserve">
+    <value>Branch: -</value>
+  </data>
+  <data name="Status_Changes" xml:space="preserve">
+    <value>Changes: {0}</value>
+  </data>
+
+  <!-- Analysis Mode -->
+  <data name="Status_ModeIncremental" xml:space="preserve">
+    <value>Mode: Incremental</value>
+  </data>
+  <data name="Status_ModeFull" xml:space="preserve">
+    <value>Mode: Full</value>
+  </data>
+  <data name="Status_ModeNone" xml:space="preserve">
+    <value>Mode: -</value>
+  </data>
+
+  <!-- Buttons -->
+  <data name="Button_ToggleMode" xml:space="preserve">
+    <value>Toggle Mode</value>
+  </data>
+  <data name="Button_OK" xml:space="preserve">
+    <value>OK</value>
+  </data>
+  <data name="Button_Cancel" xml:space="preserve">
+    <value>Cancel</value>
+  </data>
+
+  <!-- Messages -->
+  <data name="Message_NoIssues" xml:space="preserve">
+    <value>No code issues detected</value>
+  </data>
+  <data name="Message_Analyzing" xml:space="preserve">
+    <value>Analyzing... ({0}/{1}) {2}</value>
+  </data>
+  <data name="Message_LineNumber" xml:space="preserve">
+    <value>[Line {0}]</value>
+  </data>
+  <data name="Message_UnknownFile" xml:space="preserve">
+    <value>Unknown File</value>
+  </data>
+
+  <!-- Language Settings Dialog -->
+  <data name="Dialog_LanguageTitle" xml:space="preserve">
+    <value>Language Settings</value>
+  </data>
+  <data name="Dialog_SelectLanguage" xml:space="preserve">
+    <value>Select Language:</value>
+  </data>
+  <data name="Dialog_ShortcutHint" xml:space="preserve">
+    <value>Shortcut: Ctrl+Shift+L</value>
+  </data>
+  <data name="Dialog_RestartHint" xml:space="preserve">
+    <value>Language changes will take effect immediately</value>
+  </data>
+
+  <!-- Menu Commands -->
+  <data name="Menu_CodeIssueSummary" xml:space="preserve">
+    <value>Code Issue Summary</value>
+  </data>
+  <data name="Menu_LanguageSettings" xml:space="preserve">
+    <value>Language Settings</value>
+  </data>
+
+  <!-- Debug Messages -->
+  <data name="Debug_StartUpdate" xml:space="preserve">
+    <value>Starting analysis results update</value>
+  </data>
+  <data name="Debug_DiagnosticsNull" xml:space="preserve">
+    <value>UpdateAnalysisResults: diagnostics is null</value>
+  </data>
+  <data name="Debug_RestoreError" xml:space="preserve">
+    <value>Error restoring tool window state: {0}</value>
+  </data>
+  <data name="Debug_NavigateError" xml:space="preserve">
+    <value>Error navigating to error location: {0}</value>
+  </data>
+
+</root>

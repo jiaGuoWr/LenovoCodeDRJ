@@ -202,6 +202,39 @@
     <value>Use Path.GetTempFileName() or Path.Combine(Path.GetTempPath(), Path.GetRandomFileName()) to generate unpredictable temp file names.</value>
   </data>
 
+  <!-- SEC009: Unsafe Reflection -->
+  <data name="SEC009_Title" xml:space="preserve">
+    <value>Unsafe reflection usage</value>
+  </data>
+  <data name="SEC009_MessageFormat" xml:space="preserve">
+    <value>Unsafe reflection operation detected: {0}, may lead to arbitrary type loading or access control bypass</value>
+  </data>
+  <data name="SEC009_Description" xml:space="preserve">
+    <value>Do not use user input to dynamically load types or access non-public members. This may lead to code execution or information disclosure.</value>
+  </data>
+
+  <!-- SEC010: Race Condition -->
+  <data name="SEC010_Title" xml:space="preserve">
+    <value>Thread synchronization/race condition risk</value>
+  </data>
+  <data name="SEC010_MessageFormat" xml:space="preserve">
+    <value>Potential race condition detected: {0}, may lead to data inconsistency or security vulnerabilities</value>
+  </data>
+  <data name="SEC010_Description" xml:space="preserve">
+    <value>Access to shared state should use lock, Interlocked, or thread-safe collections for synchronization.</value>
+  </data>
+
+  <!-- SEC011: Insecure IPC -->
+  <data name="SEC011_Title" xml:space="preserve">
+    <value>Insecure IPC/remote call</value>
+  </data>
+  <data name="SEC011_MessageFormat" xml:space="preserve">
+    <value>Insecure communication configuration detected: {0}, data transmission is not encrypted</value>
+  </data>
+  <data name="SEC011_Description" xml:space="preserve">
+    <value>Remote calls should use HTTPS, TLS, or other encrypted transport. Avoid using insecure bindings or HTTP endpoints.</value>
+  </data>
+
   <!-- DLL Signature Messages -->
   <data name="DLL003_UnknownDll" xml:space="preserve">
     <value>Unknown DLL name</value>

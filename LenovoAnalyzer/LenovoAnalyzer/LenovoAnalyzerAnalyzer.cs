@@ -142,7 +142,37 @@ public class LenovoQiraCodeAnalyzerAnalyzer : DiagnosticAnalyzer
         "Security",
         DiagnosticSeverity.Warning,
         isEnabledByDefault: true,
-        description: "应使用Path.GetTempFileName()或Path.Combine(Path.GetTempPath(), Path.GetRandomFileName())生成不可预测的临时文件名");
+        description: "应使用Path.GetTempFileName()或Path.Combine(Path.GetTempPath(), Path.GetRandomFileName())生成不可预测的临时文件名。");
+
+    public const string UnsafeReflectionId = "SEC009";
+    private static readonly DiagnosticDescriptor UnsafeReflectionRule = new DiagnosticDescriptor(
+        UnsafeReflectionId,
+        "不安全的反射使用",
+        "检测到不安全的反射操作: {0}，可能导致任意类型加载或访问控制绕过",
+        "Security",
+        DiagnosticSeverity.Warning,
+        isEnabledByDefault: true,
+        description: "不应使用用户输入动态加载类型或访问非公开成员，可能导致代码执行或信息泄露。");
+
+    public const string RaceConditionId = "SEC010";
+    private static readonly DiagnosticDescriptor RaceConditionRule = new DiagnosticDescriptor(
+        RaceConditionId,
+        "线程同步/竞争条件风险",
+        "检测到潜在的竞争条件: {0}，可能导致数据不一致或安全漏洞",
+        "Security",
+        DiagnosticSeverity.Warning,
+        isEnabledByDefault: true,
+        description: "共享状态的访问应使用lock、Interlocked或线程安全集合进行同步。");
+
+    public const string InsecureIpcId = "SEC011";
+    private static readonly DiagnosticDescriptor InsecureIpcRule = new DiagnosticDescriptor(
+        InsecureIpcId,
+        "不安全的IPC/远程调用",
+        "检测到不安全的通信配置: {0}，数据传输未加密",
+        "Security",
+        DiagnosticSeverity.Warning,
+        isEnabledByDefault: true,
+        description: "远程调用应使用HTTPS、TLS或其他加密传输，避免使用不安全的绑定或HTTP端点。");
 
     public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics
         => ImmutableArray.Create(
@@ -154,7 +184,10 @@ public class LenovoQiraCodeAnalyzerAnalyzer : DiagnosticAnalyzer
             InsecureRandomRule,
             RegexDosRule,
             ResourceLeakRule,
-            InsecureTempFileRule);
+            InsecureTempFileRule,
+            UnsafeReflectionRule,
+            RaceConditionRule,
+            InsecureIpcRule);
 
     private static readonly HashSet<string> SensitiveKeywords = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
     {
@@ -190,6 +223,22 @@ public class LenovoQiraCodeAnalyzerAnalyzer : DiagnosticAnalyzer
         "IsMatch", "Match", "Matches", "Replace", "Split"
     };
 
+    private static readonly HashSet<string> UnsafeReflectionMethods = new HashSet<string>(StringComparer.Ordinal)
+    {
+        "GetType", "GetMethod", "GetField", "GetProperty", "GetMember",
+        "GetMethods", "GetFields", "GetProperties", "GetMembers"
+    };
+
+    private static readonly HashSet<string> NonThreadSafeCollections = new HashSet<string>(StringComparer.Ordinal)
+    {
+        "Dictionary", "List", "HashSet", "Queue", "Stack",
+        "SortedDictionary", "SortedList", "SortedSet", "LinkedList"
+    };
+
+    private static readonly HashSet<string> InsecureBindingTypes = new HashSet<string>(StringComparer.Ordinal)
+    {
+        "BasicHttpBinding", "WebHttpBinding"
+    };
 
     public override void Initialize(AnalysisContext context)
     {
@@ -233,6 +282,25 @@ public class LenovoQiraCodeAnalyzerAnalyzer : DiagnosticAnalyzer
 
         // SEC008: 不安全临时文件
         context.RegisterSyntaxNodeAction(AnalyzeInsecureTempFile, SyntaxKind.InvocationExpression);
+
+        // SEC009: 不安全反射
+        context.RegisterSyntaxNodeAction(AnalyzeUnsafeReflection, SyntaxKind.InvocationExpression);
+
+        // SEC010: 竞争条件
+        context.RegisterSyntaxNodeAction(AnalyzeRaceConditionIncrement, SyntaxKind.PostIncrementExpression);
+        context.RegisterSyntaxNodeAction(AnalyzeRaceConditionIncrement, SyntaxKind.PreIncrementExpression);
+        context.RegisterSyntaxNodeAction(AnalyzeRaceConditionDecrement, SyntaxKind.PostDecrementExpression);
+        context.RegisterSyntaxNodeAction(AnalyzeRaceConditionDecrement, SyntaxKind.PreDecrementExpression);
+        context.RegisterSyntaxNodeAction(AnalyzeRaceConditionCompoundAssignment, SyntaxKind.AddAssignmentExpression);
+        context.RegisterSyntaxNodeAction(AnalyzeRaceConditionCompoundAssignment, SyntaxKind.SubtractAssignmentExpression);
+        context.RegisterSyntaxNodeAction(AnalyzeRaceConditionCheckThenUse, SyntaxKind.IfStatement);
+        context.RegisterSyntaxNodeAction(AnalyzeNonThreadSafeCollection, SyntaxKind.InvocationExpression);
+        context.RegisterSyntaxNodeAction(AnalyzeNonThreadSafeCollectionIndexer, SyntaxKind.SimpleAssignmentExpression);
+
+        // SEC011: 不安全IPC
+        context.RegisterSyntaxNodeAction(AnalyzeInsecureBinding, SyntaxKind.ObjectCreationExpression);
+        context.RegisterSyntaxNodeAction(AnalyzeInsecureEndpoint, SyntaxKind.ObjectCreationExpression);
+        context.RegisterSyntaxNodeAction(AnalyzeInsecureHttpUrl, SyntaxKind.InvocationExpression);
     }
 
     private void AnalyzeSyntaxTreeForChineseComments(SyntaxTreeAnalysisContext context)
@@ -1674,5 +1742,533 @@ public class LenovoQiraCodeAnalyzerAnalyzer : DiagnosticAnalyzer
                 return; // 每个 Path.Combine 调用只报告一次
             }
         }
+    }
+
+    // ═════════════════════════════════════════════════════════════════
+    // SEC009: 不安全的反射使用
+    // ═════════════════════════════════════════════════════════════════
+
+    /// <summary>
+    /// SEC009: 检测 Type.GetType/Activator.CreateInstance/GetMethod 等不安全反射调用
+    /// </summary>
+    private void AnalyzeUnsafeReflection(SyntaxNodeAnalysisContext context)
+    {
+        var invocation = (InvocationExpressionSyntax)context.Node;
+        
+        if (!(invocation.Expression is MemberAccessExpressionSyntax memberAccess))
+            return;
+
+        string methodName = memberAccess.Name.Identifier.Text;
+
+        // 检测 Type.GetType(userInput)
+        if (methodName.Equals("GetType", StringComparison.Ordinal))
+        {
+            var callerText = memberAccess.Expression.ToString();
+            if (callerText.Equals("Type", StringComparison.Ordinal) || 
+                callerText.EndsWith(".Type", StringComparison.Ordinal))
+            {
+                if (invocation.ArgumentList?.Arguments.Count > 0)
+                {
+                    var arg = invocation.ArgumentList.Arguments[0].Expression;
+                    if (!IsStringLiteral(arg))
+                    {
+                        context.ReportDiagnostic(Diagnostic.Create(
+                            UnsafeReflectionRule,
+                            invocation.GetLocation(),
+                            "Type.GetType() 使用了非常量参数，可能加载任意类型"));
+                    }
+                }
+            }
+        }
+
+        // 检测 GetMethod/GetField/GetProperty 使用 BindingFlags.NonPublic
+        if (methodName.Equals("GetMethod", StringComparison.Ordinal) ||
+            methodName.Equals("GetField", StringComparison.Ordinal) ||
+            methodName.Equals("GetProperty", StringComparison.Ordinal))
+        {
+            if (invocation.ArgumentList != null)
+            {
+                foreach (var arg in invocation.ArgumentList.Arguments)
+                {
+                    var argText = arg.Expression.ToString();
+                    if (argText.Contains("NonPublic"))
+                    {
+                        context.ReportDiagnostic(Diagnostic.Create(
+                            UnsafeReflectionRule,
+                            invocation.GetLocation(),
+                            $"{methodName}() 使用 BindingFlags.NonPublic 访问非公开成员，可能绕过访问控制"));
+                        return;
+                    }
+                }
+            }
+        }
+
+        // 检测 MethodInfo.Invoke 调用
+        if (methodName.Equals("Invoke", StringComparison.Ordinal))
+        {
+            var callerText = memberAccess.Expression.ToString();
+            if (callerText.Contains("GetMethod") || callerText.Contains("method"))
+            {
+                context.ReportDiagnostic(Diagnostic.Create(
+                    UnsafeReflectionRule,
+                    invocation.GetLocation(),
+                    "通过反射调用方法 (MethodInfo.Invoke)，应确保方法名不受用户控制"));
+            }
+        }
+    }
+
+    private bool IsStringLiteral(ExpressionSyntax expression)
+    {
+        return expression is LiteralExpressionSyntax literal && 
+               literal.IsKind(SyntaxKind.StringLiteralExpression);
+    }
+
+    // ═════════════════════════════════════════════════════════════════
+    // SEC010: 线程同步/竞争条件
+    // ═════════════════════════════════════════════════════════════════
+
+    /// <summary>
+    /// SEC010: 检测字段的自增操作是否缺少同步
+    /// </summary>
+    private void AnalyzeRaceConditionIncrement(SyntaxNodeAnalysisContext context)
+    {
+        var increment = context.Node;
+        ExpressionSyntax operand = null;
+
+        if (increment is PostfixUnaryExpressionSyntax postfix)
+            operand = postfix.Operand;
+        else if (increment is PrefixUnaryExpressionSyntax prefix)
+            operand = prefix.Operand;
+
+        if (operand == null) return;
+
+        // 只检查字段访问
+        if (!IsFieldAccess(operand)) return;
+
+        // 检查是否在 lock 语句内
+        if (IsInsideLockStatement(increment)) return;
+
+        // 检查是否在 Interlocked 调用中
+        if (IsInsideInterlockedCall(increment)) return;
+
+        context.ReportDiagnostic(Diagnostic.Create(
+            RaceConditionRule,
+            increment.GetLocation(),
+            "字段自增操作 (++) 不是原子操作，应使用 Interlocked.Increment 或 lock"));
+    }
+
+    /// <summary>
+    /// SEC010: 检测字段的自减操作是否缺少同步
+    /// </summary>
+    private void AnalyzeRaceConditionDecrement(SyntaxNodeAnalysisContext context)
+    {
+        var decrement = context.Node;
+        ExpressionSyntax operand = null;
+
+        if (decrement is PostfixUnaryExpressionSyntax postfix)
+            operand = postfix.Operand;
+        else if (decrement is PrefixUnaryExpressionSyntax prefix)
+            operand = prefix.Operand;
+
+        if (operand == null) return;
+
+        if (!IsFieldAccess(operand)) return;
+        if (IsInsideLockStatement(decrement)) return;
+        if (IsInsideInterlockedCall(decrement)) return;
+
+        context.ReportDiagnostic(Diagnostic.Create(
+            RaceConditionRule,
+            decrement.GetLocation(),
+            "字段自减操作 (--) 不是原子操作，应使用 Interlocked.Decrement 或 lock"));
+    }
+
+    /// <summary>
+    /// SEC010: 检测字段的复合赋值操作是否缺少同步
+    /// </summary>
+    private void AnalyzeRaceConditionCompoundAssignment(SyntaxNodeAnalysisContext context)
+    {
+        var assignment = (AssignmentExpressionSyntax)context.Node;
+
+        if (!IsFieldAccess(assignment.Left)) return;
+        if (IsInsideLockStatement(assignment)) return;
+
+        string opText = assignment.OperatorToken.Text;
+        context.ReportDiagnostic(Diagnostic.Create(
+            RaceConditionRule,
+            assignment.GetLocation(),
+            $"字段复合赋值操作 ({opText}) 不是原子操作，应使用 Interlocked 或 lock"));
+    }
+
+    /// <summary>
+    /// SEC010: 检测 check-then-use 模式
+    /// </summary>
+    private void AnalyzeRaceConditionCheckThenUse(SyntaxNodeAnalysisContext context)
+    {
+        var ifStatement = (IfStatementSyntax)context.Node;
+
+        // 检查是否在 lock 语句内
+        if (IsInsideLockStatement(ifStatement)) return;
+
+        // 查找条件中的字段引用
+        var conditionFields = GetFieldReferences(ifStatement.Condition);
+        if (!conditionFields.Any()) return;
+
+        // 查找语句体中对相同字段的修改
+        var bodyModifications = GetFieldModifications(ifStatement.Statement);
+
+        // 检查是否有相同字段在条件和语句体中都被访问
+        foreach (var field in conditionFields)
+        {
+            if (bodyModifications.Contains(field))
+            {
+                context.ReportDiagnostic(Diagnostic.Create(
+                    RaceConditionRule,
+                    ifStatement.GetLocation(),
+                    $"检测到 check-then-use 模式：字段 '{field}' 在条件检查后被修改，存在竞争条件风险"));
+                return;
+            }
+        }
+    }
+
+    /// <summary>
+    /// SEC010: 检测非线程安全集合的使用
+    /// </summary>
+    private void AnalyzeNonThreadSafeCollection(SyntaxNodeAnalysisContext context)
+    {
+        var invocation = (InvocationExpressionSyntax)context.Node;
+
+        if (!(invocation.Expression is MemberAccessExpressionSyntax memberAccess))
+            return;
+
+        var callerText = memberAccess.Expression.ToString();
+
+        // 检查是否是字段访问
+        if (!callerText.StartsWith("_") && !callerText.StartsWith("this._"))
+            return;
+
+        // 检查是否在 lock 内
+        if (IsInsideLockStatement(invocation)) return;
+
+        string methodName = memberAccess.Name.Identifier.Text;
+
+        // 检查是否是修改操作
+        var modifyMethods = new HashSet<string> { "Add", "Remove", "Clear", "Insert", "RemoveAt", "RemoveAll" };
+        if (modifyMethods.Contains(methodName))
+        {
+            // 尝试判断集合类型
+            foreach (var collType in NonThreadSafeCollections)
+            {
+                if (callerText.Contains(collType) || IsNonThreadSafeCollectionField(memberAccess.Expression))
+                {
+                    context.ReportDiagnostic(Diagnostic.Create(
+                        RaceConditionRule,
+                        invocation.GetLocation(),
+                        $"非线程安全集合的 {methodName}() 操作应在 lock 内执行，或改用 Concurrent 集合"));
+                    return;
+                }
+            }
+        }
+    }
+
+    private bool IsFieldAccess(ExpressionSyntax expression)
+    {
+        var text = expression.ToString();
+        // 简单启发式：以 _ 开头或 this._ 开头的标识符视为字段
+        return text.StartsWith("_") || text.StartsWith("this._") ||
+               (expression is MemberAccessExpressionSyntax ma && 
+                ma.Expression is ThisExpressionSyntax);
+    }
+
+    private bool IsInsideLockStatement(SyntaxNode node)
+    {
+        var parent = node.Parent;
+        while (parent != null)
+        {
+            if (parent is LockStatementSyntax)
+                return true;
+            if (parent is MethodDeclarationSyntax || parent is ClassDeclarationSyntax)
+                break;
+            parent = parent.Parent;
+        }
+        return false;
+    }
+
+    private bool IsInsideInterlockedCall(SyntaxNode node)
+    {
+        var parent = node.Parent;
+        while (parent != null)
+        {
+            if (parent is InvocationExpressionSyntax invocation)
+            {
+                var invocText = invocation.Expression.ToString();
+                if (invocText.Contains("Interlocked"))
+                    return true;
+            }
+            if (parent is MethodDeclarationSyntax)
+                break;
+            parent = parent.Parent;
+        }
+        return false;
+    }
+
+    private HashSet<string> GetFieldReferences(SyntaxNode node)
+    {
+        var fields = new HashSet<string>();
+        foreach (var identifier in node.DescendantNodes().OfType<IdentifierNameSyntax>())
+        {
+            var name = identifier.Identifier.Text;
+            if (name.StartsWith("_"))
+                fields.Add(name);
+        }
+        foreach (var memberAccess in node.DescendantNodes().OfType<MemberAccessExpressionSyntax>())
+        {
+            if (memberAccess.Expression is ThisExpressionSyntax)
+            {
+                fields.Add(memberAccess.Name.Identifier.Text);
+            }
+        }
+        return fields;
+    }
+
+    private HashSet<string> GetFieldModifications(SyntaxNode node)
+    {
+        var fields = new HashSet<string>();
+        
+        foreach (var assignment in node.DescendantNodes().OfType<AssignmentExpressionSyntax>())
+        {
+            var leftText = assignment.Left.ToString();
+            if (leftText.StartsWith("_"))
+                fields.Add(leftText);
+            else if (assignment.Left is MemberAccessExpressionSyntax ma && 
+                     ma.Expression is ThisExpressionSyntax)
+                fields.Add(ma.Name.Identifier.Text);
+        }
+
+        foreach (var unary in node.DescendantNodes().OfType<PostfixUnaryExpressionSyntax>())
+        {
+            var opText = unary.Operand.ToString();
+            if (opText.StartsWith("_"))
+                fields.Add(opText);
+        }
+
+        foreach (var unary in node.DescendantNodes().OfType<PrefixUnaryExpressionSyntax>())
+        {
+            var opText = unary.Operand.ToString();
+            if (opText.StartsWith("_"))
+                fields.Add(opText);
+        }
+
+        return fields;
+    }
+
+    private bool IsNonThreadSafeCollectionField(ExpressionSyntax expression)
+    {
+        return expression is IdentifierNameSyntax id && id.Identifier.Text.StartsWith("_");
+    }
+
+    /// <summary>
+    /// SEC010: 检测非线程安全集合的索引器赋值 (如 _dict[key] = value)
+    /// </summary>
+    private void AnalyzeNonThreadSafeCollectionIndexer(SyntaxNodeAnalysisContext context)
+    {
+        var assignment = (AssignmentExpressionSyntax)context.Node;
+
+        // 检查左侧是否是索引器访问 (ElementAccessExpression)
+        if (!(assignment.Left is ElementAccessExpressionSyntax elementAccess))
+            return;
+
+        var collectionExpr = elementAccess.Expression.ToString();
+
+        // 检查是否是字段访问
+        if (!collectionExpr.StartsWith("_") && !collectionExpr.StartsWith("this._"))
+            return;
+
+        // 检查字段是否是 Concurrent 集合类型 (通过查找字段声明)
+        if (IsConcurrentCollectionField(elementAccess.Expression, context))
+            return;
+
+        // 检查是否在 lock 内
+        if (IsInsideLockStatement(assignment)) return;
+
+        context.ReportDiagnostic(Diagnostic.Create(
+            RaceConditionRule,
+            assignment.GetLocation(),
+            "非线程安全集合的索引器赋值操作应在 lock 内执行，或改用 ConcurrentDictionary"));
+    }
+
+    /// <summary>
+    /// 检查字段是否是 Concurrent 集合类型
+    /// </summary>
+    private bool IsConcurrentCollectionField(ExpressionSyntax expression, SyntaxNodeAnalysisContext context)
+    {
+        string fieldName = expression.ToString().TrimStart('_').Replace("this._", "");
+        if (expression is IdentifierNameSyntax id)
+            fieldName = id.Identifier.Text;
+
+        // 查找包含此字段的类声明
+        var classDecl = expression.FirstAncestorOrSelf<ClassDeclarationSyntax>();
+        if (classDecl == null) return false;
+
+        // 在类中查找字段声明
+        foreach (var member in classDecl.Members)
+        {
+            if (member is FieldDeclarationSyntax fieldDecl)
+            {
+                foreach (var variable in fieldDecl.Declaration.Variables)
+                {
+                    if (variable.Identifier.Text == fieldName || 
+                        "_" + variable.Identifier.Text == fieldName ||
+                        variable.Identifier.Text == expression.ToString())
+                    {
+                        var typeText = fieldDecl.Declaration.Type.ToString();
+                        if (typeText.Contains("Concurrent"))
+                            return true;
+                    }
+                }
+            }
+        }
+
+        return false;
+    }
+
+    // ═════════════════════════════════════════════════════════════════
+    // SEC011: 不安全的IPC/远程调用
+    // ═════════════════════════════════════════════════════════════════
+
+    /// <summary>
+    /// SEC011: 检测不安全的绑定类型
+    /// </summary>
+    private void AnalyzeInsecureBinding(SyntaxNodeAnalysisContext context)
+    {
+        var objectCreation = (ObjectCreationExpressionSyntax)context.Node;
+        string typeName = GetSimpleTypeName(objectCreation.Type);
+
+        // 检测 BasicHttpBinding（默认无加密）
+        if (typeName.Equals("BasicHttpBinding", StringComparison.Ordinal))
+        {
+            // 检查是否传入了安全模式参数
+            if (objectCreation.ArgumentList == null || objectCreation.ArgumentList.Arguments.Count == 0)
+            {
+                context.ReportDiagnostic(Diagnostic.Create(
+                    InsecureIpcRule,
+                    objectCreation.GetLocation(),
+                    "BasicHttpBinding 默认不使用加密，建议使用 WSHttpBinding 或配置 Transport 安全模式"));
+                return;
+            }
+        }
+
+        // 检测 NetTcpBinding/WSHttpBinding 使用 SecurityMode.None
+        if (typeName.Equals("NetTcpBinding", StringComparison.Ordinal) ||
+            typeName.Equals("WSHttpBinding", StringComparison.Ordinal))
+        {
+            if (objectCreation.ArgumentList?.Arguments.Count > 0)
+            {
+                var argText = objectCreation.ArgumentList.Arguments[0].Expression.ToString();
+                if (argText.Contains("SecurityMode.None") || argText.EndsWith(".None"))
+                {
+                    context.ReportDiagnostic(Diagnostic.Create(
+                        InsecureIpcRule,
+                        objectCreation.GetLocation(),
+                        $"{typeName} 使用 SecurityMode.None 禁用了安全，数据将以明文传输"));
+                }
+            }
+        }
+    }
+
+    /// <summary>
+    /// SEC011: 检测不安全的端点地址
+    /// </summary>
+    private void AnalyzeInsecureEndpoint(SyntaxNodeAnalysisContext context)
+    {
+        var objectCreation = (ObjectCreationExpressionSyntax)context.Node;
+        string typeName = GetSimpleTypeName(objectCreation.Type);
+
+        // 检测 EndpointAddress 或 Uri 使用 HTTP
+        if (typeName.Equals("EndpointAddress", StringComparison.Ordinal) ||
+            typeName.Equals("Uri", StringComparison.Ordinal))
+        {
+            if (objectCreation.ArgumentList?.Arguments.Count > 0)
+            {
+                var arg = objectCreation.ArgumentList.Arguments[0].Expression;
+                if (IsInsecureHttpUrl(arg))
+                {
+                    context.ReportDiagnostic(Diagnostic.Create(
+                        InsecureIpcRule,
+                        objectCreation.GetLocation(),
+                        "使用 HTTP 端点地址，数据传输未加密，建议使用 HTTPS"));
+                }
+            }
+        }
+    }
+
+    /// <summary>
+    /// SEC011: 检测方法调用中的不安全 HTTP URL
+    /// </summary>
+    private void AnalyzeInsecureHttpUrl(SyntaxNodeAnalysisContext context)
+    {
+        var invocation = (InvocationExpressionSyntax)context.Node;
+
+        if (!(invocation.Expression is MemberAccessExpressionSyntax memberAccess))
+            return;
+
+        string methodName = memberAccess.Name.Identifier.Text;
+
+        // 检测 GrpcChannel.ForAddress
+        if (methodName.Equals("ForAddress", StringComparison.Ordinal))
+        {
+            var callerText = memberAccess.Expression.ToString();
+            if (callerText.Contains("GrpcChannel") || callerText.EndsWith("Channel"))
+            {
+                if (invocation.ArgumentList?.Arguments.Count > 0)
+                {
+                    var arg = invocation.ArgumentList.Arguments[0].Expression;
+                    if (IsInsecureHttpUrl(arg))
+                    {
+                        context.ReportDiagnostic(Diagnostic.Create(
+                            InsecureIpcRule,
+                            invocation.GetLocation(),
+                            "gRPC 通道使用 HTTP 地址，建议使用 HTTPS 以启用 TLS 加密"));
+                    }
+                }
+            }
+        }
+
+        // 检测 WebClient.DownloadString 等方法
+        if (methodName.Equals("DownloadString", StringComparison.Ordinal) ||
+            methodName.Equals("DownloadData", StringComparison.Ordinal) ||
+            methodName.Equals("UploadString", StringComparison.Ordinal) ||
+            methodName.Equals("UploadData", StringComparison.Ordinal))
+        {
+            if (invocation.ArgumentList?.Arguments.Count > 0)
+            {
+                var arg = invocation.ArgumentList.Arguments[0].Expression;
+                if (IsInsecureHttpUrl(arg))
+                {
+                    context.ReportDiagnostic(Diagnostic.Create(
+                        InsecureIpcRule,
+                        invocation.GetLocation(),
+                        $"WebClient.{methodName}() 使用 HTTP URL，数据传输未加密"));
+                }
+            }
+        }
+    }
+
+    private bool IsInsecureHttpUrl(ExpressionSyntax expression)
+    {
+        string text = expression.ToString().Trim('"');
+        
+        // 跳过本地地址
+        if (text.Contains("localhost") || text.Contains("127.0.0.1") || text.Contains("[::1]"))
+            return false;
+
+        // 检测 http:// 开头（但不是 https://）
+        if (text.StartsWith("http://", StringComparison.OrdinalIgnoreCase))
+            return true;
+
+        // 检测变量中包含 http://
+        if (expression is IdentifierNameSyntax)
+            return false; // 无法在编译时确定变量值，不报告
+
+        return false;
     }
 }

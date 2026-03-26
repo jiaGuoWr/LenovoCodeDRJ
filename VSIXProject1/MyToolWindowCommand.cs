@@ -532,38 +532,46 @@ namespace VSIXProject1
                 var fileDiagnosticsList = new List<Diagnostic>[totalFiles];
                 var progressLock = new object();
 
+                var tasks = new Task[totalFiles];
                 Parallel.For(0, totalFiles, options, i =>
                 {
-                    try
+                    int index = i; // capture loop variable
+                    tasks[index] = Task.Run(async () =>
                     {
-                        cancellationToken.ThrowIfCancellationRequested();
-
-                        lock (progressLock)
+                        try
                         {
-                            progress?.Report(new AnalysisProgress
+                            cancellationToken.ThrowIfCancellationRequested();
+
+                            lock (progressLock)
                             {
-                                CompletedFiles = completedFiles,
-                                TotalFiles = totalFiles,
-                                CurrentFile = filesToAnalyze[i]
-                            });
+                                progress?.Report(new AnalysisProgress
+                                {
+                                    CompletedFiles = completedFiles,
+                                    TotalFiles = totalFiles,
+                                    CurrentFile = filesToAnalyze[index]
+                                });
+                            }
+
+                            var fileDiagnostics = await AnalyzeFileAsync(filesToAnalyze[index], cancellationToken);
+                            fileDiagnosticsList[index] = fileDiagnostics.ToList();
+
+                            Interlocked.Increment(ref completedFiles);
                         }
-
-                        var fileDiagnostics = AnalyzeFile(filesToAnalyze[i], cancellationToken);
-                        fileDiagnosticsList[i] = fileDiagnostics.ToList();
-
-                        Interlocked.Increment(ref completedFiles);
-                    }
-                    catch (OperationCanceledException)
-                    {
-                        throw;
-                    }
-                    catch (Exception ex)
-                    {
-                        Debug.WriteLine($"分析文件失败 {filesToAnalyze[i]}: {ex.Message}");
-                        fileDiagnosticsList[i] = new List<Diagnostic>();
-                        Interlocked.Increment(ref completedFiles);
-                    }
+                        catch (OperationCanceledException)
+                        {
+                            throw;
+                        }
+                        catch (Exception ex)
+                        {
+                            Debug.WriteLine($"分析文件失败 {filesToAnalyze[index]}: {ex.Message}");
+                            fileDiagnosticsList[index] = new List<Diagnostic>();
+                            Interlocked.Increment(ref completedFiles);
+                        }
+                    }, cancellationToken);
                 });
+                
+                // Wait for all async file analysis tasks to complete
+                Task.WaitAll(tasks);
 
                 foreach (var fileDiagnostics in fileDiagnosticsList)
                 {
@@ -608,7 +616,7 @@ namespace VSIXProject1
         /// <summary>
         /// 同步分析文件 - 避免在 Parallel.For 中使用 .GetAwaiter().GetResult()
         /// </summary>
-        private IEnumerable<Diagnostic> AnalyzeFile(string filePath, CancellationToken cancellationToken = default)
+        private async Task<IEnumerable<Diagnostic>> AnalyzeFileAsync(string filePath, CancellationToken cancellationToken = default)
         {
             var diagnostics = new List<Diagnostic>();
 
@@ -689,12 +697,10 @@ namespace VSIXProject1
                     try
                     {
                         // 使用同步方法获取诊断
-                        var fileDiagnostics = compilation
+                        var fileDiagnostics = await compilation
                             .WithAnalyzers(ImmutableArray.Create<DiagnosticAnalyzer>(analyzer), cancellationToken: linkedToken)
                             .GetAnalyzerDiagnosticsAsync(linkedToken)
-                            .ConfigureAwait(false)
-                            .GetAwaiter()
-                            .GetResult();
+                            .ConfigureAwait(false);
                         diagnostics.AddRange(fileDiagnostics);
                     }
                     finally

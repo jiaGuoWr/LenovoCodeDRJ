@@ -31,53 +31,13 @@ namespace VSIXProject1
     public partial class SummaryWindowControl : UserControl
     {
         // ViewModel 类用于 WPF 数据绑定，支持虚拟化
-        public class DiagnosticFileGroup
-        {
-            public string HeaderText { get; set; }
-            public List<DiagnosticItem> Diagnostics { get; set; } = new List<DiagnosticItem>();
-        }
-
-        public class DiagnosticItem : IEquatable<DiagnosticItem>
+        public class DiagnosticItem
         {
             public string DisplayText { get; set; }
             public string FilePathGroup { get; set; }
-            public string IndentMargin { get; set; } = "16,0,0,0";
-            public string TextWeight { get; set; } = "Normal";
+            public Thickness IndentMargin { get; set; } = new Thickness(16, 0, 0, 0);
+            public FontWeight TextWeight { get; set; } = FontWeights.Normal;
             public Diagnostic Diagnostic { get; set; }
-
-            public bool Equals(DiagnosticItem other)
-            {
-                if (other == null) return false;
-                if (ReferenceEquals(this, other)) return true;
-                
-                // Header rows don't have a Diagnostic but have a FilePathGroup
-                if (Diagnostic == null && other.Diagnostic == null)
-                    return DisplayText == other.DisplayText;
-                
-                if (Diagnostic == null || other.Diagnostic == null)
-                    return false;
-                
-                return Diagnostic.Id == other.Diagnostic.Id && 
-                       DisplayText == other.DisplayText &&
-                       Diagnostic.Location.GetLineSpan().Path == other.Diagnostic.Location.GetLineSpan().Path &&
-                       Diagnostic.Location.GetLineSpan().StartLinePosition.Line == other.Diagnostic.Location.GetLineSpan().StartLinePosition.Line;
-            }
-
-            public override int GetHashCode()
-            {
-                unchecked
-                {
-                    int hash = 17;
-                    hash = hash * 23 + (DisplayText?.GetHashCode() ?? 0);
-                    if (Diagnostic != null)
-                    {
-                        hash = hash * 23 + (Diagnostic.Id?.GetHashCode() ?? 0);
-                        hash = hash * 23 + (Diagnostic.Location.GetLineSpan().Path?.GetHashCode() ?? 0);
-                        hash = hash * 23 + Diagnostic.Location.GetLineSpan().StartLinePosition.Line.GetHashCode();
-                    }
-                    return hash;
-                }
-            }
         }
 
         private IVsSolution _solution;
@@ -87,15 +47,6 @@ namespace VSIXProject1
 
         private bool _isLanguageChangedSubscribed;
         private List<Diagnostic> _latestDiagnostics = new List<Diagnostic>();
-
-        // 使用 ObservableCollection 维护界面数据，实现差异化更新以避免卡顿
-        private ObservableCollection<DiagnosticItem> _uiDiagnostics = new ObservableCollection<DiagnosticItem>();
-
-        public SummaryWindowControl()
-        {
-            InitializeComponent();
-            DiagnosticsTree.ItemsSource = _uiDiagnostics;
-        }
 
         public void Initialize(AsyncPackage package)
         {
@@ -331,7 +282,8 @@ namespace VSIXProject1
             if (diagnostics == null)
             {
                 Debug.WriteLine("UpdateAnalysisResults: diagnostics 为空");
-                _uiDiagnostics.Clear();
+                await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
+                DiagnosticsTree.ItemsSource = null;
                 return;
             }
 
@@ -342,7 +294,8 @@ namespace VSIXProject1
 
             if (uniqueDiagnostics.Count == 0)
             {
-                _uiDiagnostics.Clear();
+                await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
+                DiagnosticsTree.ItemsSource = null;
                 return;
             }
 
@@ -371,8 +324,8 @@ namespace VSIXProject1
                     list.Add(new DiagnosticItem
                     {
                         DisplayText = $"{group.Key} ({group.Count()})",
-                        IndentMargin = "2,4,2,2",
-                        TextWeight = "Bold",
+                        IndentMargin = new Thickness(2, 4, 2, 2),
+                        TextWeight = FontWeights.Bold,
                         Diagnostic = null // 头部不可跳转
                     });
 
@@ -387,8 +340,8 @@ namespace VSIXProject1
                         list.Add(new DiagnosticItem
                         {
                             DisplayText = $"{lineLabel} {diagnostic.Id}: {localizedMessage}",
-                            IndentMargin = "16,0,0,0",
-                            TextWeight = "Normal",
+                            IndentMargin = new Thickness(16, 0, 0, 0),
+                            TextWeight = FontWeights.Normal,
                             Diagnostic = diagnostic
                         });
                     }
@@ -397,78 +350,12 @@ namespace VSIXProject1
                 return list;
             });
 
-            // 切回UI线程增量更新 ObservableCollection 以避免破坏 UI 虚拟化并防止重绘卡顿
+            // 切回UI线程直接绑定数据
             await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
 
-            // 差异化更新 UI (Incremental Diffing Update)
-            int oldIndex = 0;
-            int newIndex = 0;
+            DiagnosticsTree.ItemsSource = flattenedData;
 
-            while (oldIndex < _uiDiagnostics.Count || newIndex < flattenedData.Count)
-            {
-                // 如果旧列表已经遍历完，直接把新列表剩下的元素加到尾部
-                if (oldIndex >= _uiDiagnostics.Count)
-                {
-                    _uiDiagnostics.Add(flattenedData[newIndex]);
-                    newIndex++;
-                }
-                // 如果新列表已经遍历完，直接把旧列表剩下的元素删掉
-                else if (newIndex >= flattenedData.Count)
-                {
-                    _uiDiagnostics.RemoveAt(_uiDiagnostics.Count - 1);
-                }
-                else
-                {
-                    var oldItem = _uiDiagnostics[oldIndex];
-                    var newItem = flattenedData[newIndex];
-
-                    if (oldItem.Equals(newItem))
-                    {
-                        // 元素相同，都向前推进
-                        oldIndex++;
-                        newIndex++;
-                    }
-                    else
-                    {
-                        // 元素不同。为了简化复杂的 Diff 算法且保证性能，
-                        // 当遇到不同时，尝试判断是新增还是删除（向前探查1步）
-                        bool isInsert = false;
-                        bool isDelete = false;
-
-                        // 探查是否为新增（新列表下一个等于旧列表当前）
-                        if (newIndex + 1 < flattenedData.Count && _uiDiagnostics[oldIndex].Equals(flattenedData[newIndex + 1]))
-                        {
-                            isInsert = true;
-                        }
-                        // 探查是否为删除（旧列表下一个等于新列表当前）
-                        else if (oldIndex + 1 < _uiDiagnostics.Count && _uiDiagnostics[oldIndex + 1].Equals(flattenedData[newIndex]))
-                        {
-                            isDelete = true;
-                        }
-
-                        if (isInsert)
-                        {
-                            _uiDiagnostics.Insert(oldIndex, newItem);
-                            oldIndex++; // 因为插入了一个元素，旧列表的索引也要跟着右移
-                            newIndex++;
-                        }
-                        else if (isDelete)
-                        {
-                            _uiDiagnostics.RemoveAt(oldIndex);
-                            // 不改变索引，下一次循环继续用当前的 oldIndex 比较新的元素
-                        }
-                        else
-                        {
-                            // 既不是单纯的新增也不是单纯的删除，直接替换
-                            _uiDiagnostics[oldIndex] = newItem;
-                            oldIndex++;
-                            newIndex++;
-                        }
-                    }
-                }
-            }
-
-            Debug.WriteLine($"UpdateAnalysisResults: 完成差异化更新，目前共 {_uiDiagnostics.Count} 个 UI 节点");
+            Debug.WriteLine($"UpdateAnalysisResults: 完成扁平化 UI 数据绑定，目前共 {flattenedData.Count} 个 UI 节点");
         }
 
         /// <summary>
@@ -573,7 +460,7 @@ namespace VSIXProject1
         public void ClearResults()
         {
             ThreadHelper.ThrowIfNotOnUIThread();
-            _uiDiagnostics.Clear();
+            DiagnosticsTree.ItemsSource = null;
         }
 
         // 更新 Git 状态显示

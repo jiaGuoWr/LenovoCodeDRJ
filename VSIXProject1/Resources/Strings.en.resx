@@ -61,7 +61,7 @@
 
   <!-- Tool Window Title -->
   <data name="ToolWindow_Title" xml:space="preserve">
-    <value>Code Issue Summary</value>
+    <value>Risk Code Summary</value>
   </data>
 
   <!-- Git Status -->
@@ -105,7 +105,7 @@
 
   <!-- Messages -->
   <data name="Message_NoIssues" xml:space="preserve">
-    <value>No code issues detected</value>
+    <value>No risk code detected</value>
   </data>
   <data name="Message_Analyzing" xml:space="preserve">
     <value>Analyzing... ({0}/{1}) {2}</value>
@@ -133,7 +133,7 @@
 
   <!-- Menu Commands -->
   <data name="Menu_CodeIssueSummary" xml:space="preserve">
-    <value>Code Issue Summary</value>
+    <value>Risk Code Summary</value>
   </data>
   <data name="Menu_LanguageSettings" xml:space="preserve">
     <value>Language Settings</value>

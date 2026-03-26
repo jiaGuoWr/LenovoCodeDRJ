@@ -77,7 +77,7 @@ namespace VSIXProject1.Localization
                 try
                 {
                     _resourceManager = new ResourceManager(
-                        "VSIXProject1.Resources.Strings",
+                        "VSIXLenovoQiraDRJ.Resources.Strings",
                         typeof(LocalizationService).Assembly);
 
                     LoadFromSettings(package);

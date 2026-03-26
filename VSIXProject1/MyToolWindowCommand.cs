@@ -144,7 +144,7 @@ namespace VSIXProject1
         // 防抖定时器，用于延迟执行分析
         private System.Threading.Timer _debounceTimer;
         private readonly object _debounceLock = new object();
-        private const int DEBOUNCE_DELAY_MS = 2000; // 2秒防抖延迟，避免大文件频繁保存卡顿
+        private const int DEBOUNCE_DELAY_MS = 1200; // 1200毫秒防抖延迟，加速刷新响应
         private readonly SemaphoreSlim _refreshExecutionGate = new SemaphoreSlim(1, 1);
         private CancellationTokenSource _refreshAnalysisCts;
         private int _pendingRefreshRequests = 0;

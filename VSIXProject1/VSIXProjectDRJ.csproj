@@ -64,6 +64,12 @@
     <Compile Include="VSIXProject1Package.cs" />
   </ItemGroup>
   <ItemGroup>
+    <EmbeddedResource Include="Resources\Strings.resx">
+      <SubType>Designer</SubType>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Resources\Strings.en.resx" />
+  </ItemGroup>
+  <ItemGroup>
     <None Include="overview.md" />
     <None Include="publishManifest.json" />
     <None Include="source.extension.vsixmanifest">

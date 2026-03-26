@@ -331,18 +331,18 @@ namespace VSIXProject1
             if (diagnostics == null)
             {
                 Debug.WriteLine("UpdateAnalysisResults: diagnostics 为空");
-                DiagnosticsTree.ItemsSource = null;
+                _uiDiagnostics.Clear();
                 return;
             }
 
-            // 使用 DiagnosticEqualityComparer 去重 - 确保不同位置的问题都能显示
-            var uniqueDiagnostics = diagnostics.Distinct(_diagnosticComparer).ToList();
+            // 诊断结果已在后台线程去重，此处直接使用
+            var uniqueDiagnostics = _latestDiagnostics;
 
-            Debug.WriteLine($"UpdateAnalysisResults: 去重后诊断数量={uniqueDiagnostics.Count}");
+            Debug.WriteLine($"UpdateAnalysisResults: 诊断数量={uniqueDiagnostics.Count}");
 
             if (uniqueDiagnostics.Count == 0)
             {
-                DiagnosticsTree.ItemsSource = null;
+                _uiDiagnostics.Clear();
                 return;
             }
 

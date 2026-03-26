@@ -153,4 +153,11 @@
     <value>Error navigating to error location: {0}</value>
   </data>
 
+
+  <data name="Lang_English" xml:space="preserve">
+    <value>English</value>
+  </data>
+  <data name="Lang_Chinese" xml:space="preserve">
+    <value>Chinese Simplified</value>
+  </data>
 </root>

@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Immutable;
 using System.Composition;
 using System.Diagnostics;
@@ -45,7 +45,7 @@ namespace LenovoQiraCodeAnalyzer
                     {
                         context.RegisterCodeFix(
                             CodeAction.Create(
-                                title: "删除中文注释",
+                                title: CodeFixResources.ResourceManager.GetString("CodeFix_DeleteChineseComment") ?? "删除中文注释",
                                 createChangedDocument: c => RemoveCommentAsync(context.Document, commentTrivia, c),
                                 equivalenceKey: "DeleteChineseComment"),
                             diag);
@@ -58,7 +58,7 @@ namespace LenovoQiraCodeAnalyzer
                     {
                         context.RegisterCodeFix(
                             CodeAction.Create(
-                                title: "添加DefaultDllImportSearchPaths属性",
+                                title: CodeFixResources.ResourceManager.GetString("CodeFix_AddDllImportSearchPaths") ?? "添加DefaultDllImportSearchPaths属性",
                                 createChangedDocument: c => AddDllImportSearchPathsAsync(context.Document, attributeList, c),
                                 equivalenceKey: "AddDllImportSearchPaths"),
                             diag);
@@ -71,7 +71,7 @@ namespace LenovoQiraCodeAnalyzer
                     {
                         context.RegisterCodeFix(
                             CodeAction.Create(
-                                title: "将堆栈信息替换为错误消息",
+                                title: CodeFixResources.ResourceManager.GetString("CodeFix_ReplaceStackTraceWithMessage") ?? "将堆栈信息替换为错误消息",
                                 createChangedDocument: c => ReplaceStackTraceWithMessageAsync(context.Document, memberAccess, c),
                                 equivalenceKey: "ReplaceStackTraceWithMessage"),
                             diag);
@@ -81,7 +81,7 @@ namespace LenovoQiraCodeAnalyzer
                 {
                     context.RegisterCodeFix(
                         CodeAction.Create(
-                            title: "查看DLL具体安全信息帮助",
+                            title: CodeFixResources.ResourceManager.GetString("CodeFix_ShowDllSignatureHelp") ?? "查看DLL具体安全信息帮助",
                             createChangedDocument: c => ShowSignatureHelpAsync(context.Document, c),
                             equivalenceKey: "ShowDllSignatureHelp"),
                         diag);
@@ -96,7 +96,7 @@ namespace LenovoQiraCodeAnalyzer
                     {
                         context.RegisterCodeFix(
                             CodeAction.Create(
-                                title: "移除包含无效代码的注释",
+                                title: CodeFixResources.ResourceManager.GetString("CodeFix_RemoveInvalidCommentedCode") ?? "移除包含无效代码的注释",
                                 createChangedDocument: c => RemoveCommentAsync(context.Document, commentTrivia, c),
                                 equivalenceKey: "RemoveInvalidCommentedCode"),
                             diag);

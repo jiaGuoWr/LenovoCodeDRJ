@@ -571,35 +571,6 @@ namespace VSIXProject1
             }
         }
 
-        public void ShowLanguageSelectionDialog()
-        {
-            if (_isDisposed)
-            {
-                return;
-            }
-
-            try
-            {
-                if (_package == null)
-                {
-                    return;
-                }
-                var dialog = new LanguageSelectDialog(LocalizationService.CurrentLanguage)
-                {
-                    Owner = Window.GetWindow(this)
-                };
-                bool? result = dialog.ShowDialog();
-                if (result == true)
-                {
-                    LocalizationService.SetLanguage(dialog.SelectedLanguage, _package);
-                }
-            }
-            catch (Exception ex)
-            {
-                Debug.WriteLine($"ShowLanguageSelectionDialog 错误: {ex.Message}");
-            }
-        }
-
         // 获取父工具窗口
         private SummaryToolWindow GetParentToolWindow()
         {

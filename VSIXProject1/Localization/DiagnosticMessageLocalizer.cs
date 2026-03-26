@@ -17,16 +17,7 @@ namespace VSIXProject1.Localization
         {
             if (diagnostic == null) return string.Empty;
 
-            // Attempt to find a localized string using the diagnostic ID as the key
-            string localizedMessage = LocalizationService.GetString(diagnostic.Id);
-
-            // If the key is returned (meaning no translation was found) or it's empty, use the original message
-            if (string.IsNullOrEmpty(localizedMessage) || localizedMessage == diagnostic.Id)
-            {
-                return diagnostic.GetMessage();
-            }
-
-            return localizedMessage;
+            return diagnostic.GetMessage(LocalizationService.CurrentCulture);
         }
     }
 }

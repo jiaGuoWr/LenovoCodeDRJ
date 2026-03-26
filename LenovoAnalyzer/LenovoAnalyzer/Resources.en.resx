@@ -246,4 +246,258 @@
     <value>{0} (invalid/unsigned signature)</value>
   </data>
 
+
+  <data name="CHN001_Title" xml:space="preserve">
+    <value>Chinese content in comments</value>
+  </data>
+  <data name="CHN001_MessageFormat" xml:space="preserve">
+    <value>Comment '{0}' contains Chinese text</value>
+  </data>
+  <data name="CHN001_Description" xml:space="preserve">
+    <value>Code comments must not contain Chinese text</value>
+  </data>
+  <data name="DLL002_Title" xml:space="preserve">
+    <value>DllImport missing DefaultDllImportSearchPaths attribute</value>
+  </data>
+  <data name="DLL002_MessageFormat" xml:space="preserve">
+    <value>DllImport missing DefaultDllImportSearchPaths attribute</value>
+  </data>
+  <data name="DLL002_Description" xml:space="preserve">
+    <value>DefaultDllImportSearchPaths attribute should be specified when using DllImport</value>
+  </data>
+  <data name="EXC001_Title" xml:space="preserve">
+    <value>Stack trace should not be printed in catch block</value>
+  </data>
+  <data name="EXC001_MessageFormat" xml:space="preserve">
+    <value>Stack trace is obtained using {0} in catch block, which may leak sensitive information</value>
+  </data>
+  <data name="EXC001_Description" xml:space="preserve">
+    <value>Complete stack trace should not be printed when catching exceptions, only log necessary error messages</value>
+  </data>
+  <data name="DLL003_Title" xml:space="preserve">
+    <value>Unsafe DLL signature</value>
+  </data>
+  <data name="DLL003_MessageFormat" xml:space="preserve">
+    <value>DLL file '{0}'</value>
+  </data>
+  <data name="DLL003_Description" xml:space="preserve">
+    <value>DLL referenced by DllImport must have a valid digital signature</value>
+  </data>
+  <data name="CODE001_Title" xml:space="preserve">
+    <value>Comment contains invalid code</value>
+  </data>
+  <data name="CODE001_MessageFormat" xml:space="preserve">
+    <value>Comment contains invalid code: {0}</value>
+  </data>
+  <data name="CODE001_Description" xml:space="preserve">
+    <value>Commented out invalid code snippets should not be kept</value>
+  </data>
+  <data name="SEC001_Title" xml:space="preserve">
+    <value>Sensitive information stored in plain text</value>
+  </data>
+  <data name="SEC001_MessageFormat" xml:space="preserve">
+    <value>Sensitive information detected: {0} = "{1}"</value>
+  </data>
+  <data name="SEC001_Description" xml:space="preserve">
+    <value>Sensitive information like passwords, tokens, keys should not be stored in plain text in code. Use configuration files or environment variables instead</value>
+  </data>
+  <data name="SEC002_Title" xml:space="preserve">
+    <value>Uncontrolled search path (Path Traversal risk)</value>
+  </data>
+  <data name="SEC002_MessageFormat" xml:space="preserve">
+    <value>Uncontrolled search path detected: {0}</value>
+  </data>
+  <data name="SEC002_Description" xml:space="preserve">
+    <value>Never use user input directly as a path, as it may lead to path traversal attacks. Validate if the path is within the allowed directories</value>
+  </data>
+  <data name="SEC003_Title" xml:space="preserve">
+    <value>Potential SQL Injection risk</value>
+  </data>
+  <data name="SEC003_MessageFormat" xml:space="preserve">
+    <value>SQL injection risk detected. Dynamically built SQL statement using {0}: {1}</value>
+  </data>
+  <data name="SEC003_Description" xml:space="preserve">
+    <value>Do not use string concatenation or interpolation to dynamically build SQL statements. Use parameterized queries or ORM frameworks</value>
+  </data>
+  <data name="SEC004_Title" xml:space="preserve">
+    <value>Unsafe deserialization method used</value>
+  </data>
+  <data name="SEC004_MessageFormat" xml:space="preserve">
+    <value>Unsafe deserialization operation detected: {0}, which may lead to Remote Code Execution (RCE) vulnerability</value>
+  </data>
+  <data name="SEC004_Description" xml:space="preserve">
+    <value>BinaryFormatter and JavaScriptSerializer have deserialization vulnerabilities. Use System.Text.Json instead. If using Newtonsoft.Json, TypeNameHandling.None must be set</value>
+  </data>
+  <data name="SEC005_Title" xml:space="preserve">
+    <value>Cryptographically insecure pseudo-random number generator used</value>
+  </data>
+  <data name="SEC005_MessageFormat" xml:space="preserve">
+    <value>Insecure System.Random {0} detected. Not suitable for security contexts (like token, key generation). Use RandomNumberGenerator instead</value>
+  </data>
+  <data name="SEC005_Description" xml:space="preserve">
+    <value>System.Random uses a pseudo-random algorithm and is not cryptographically secure. RandomNumberGenerator must be used in security-sensitive scenarios like generating tokens, keys, and verification codes</value>
+  </data>
+  <data name="SEC006_Title" xml:space="preserve">
+    <value>Regular expression missing timeout parameter (ReDoS risk)</value>
+  </data>
+  <data name="SEC006_MessageFormat" xml:space="preserve">
+    <value>Regular expression {0} missing timeout parameter. Complex regex may lead to Regular Expression Denial of Service (ReDoS) attack</value>
+  </data>
+  <data name="SEC006_Description" xml:space="preserve">
+    <value>Always specify the matchTimeout parameter when using Regex to prevent backtracking explosions caused by malicious input leading to DoS attacks</value>
+  </data>
+  <data name="SEC007_Title" xml:space="preserve">
+    <value>IDisposable resource not managed by using statement (Resource Leak risk)</value>
+  </data>
+  <data name="SEC007_MessageFormat" xml:space="preserve">
+    <value>'{0}' implements IDisposable. Use a using statement or using declaration after creation to ensure the resource is disposed</value>
+  </data>
+  <data name="SEC007_Description" xml:space="preserve">
+    <value>Improper disposal of resources like database connections, file streams, and HttpClients can lead to connection pool exhaustion and file handle leaks</value>
+  </data>
+  <data name="SEC008_Title" xml:space="preserve">
+    <value>Predictable temporary file name used (Race Condition/File Enumeration risk)</value>
+  </data>
+  <data name="SEC008_MessageFormat" xml:space="preserve">
+    <value>Predictable temporary file name constructed using {0}. Attackers could predict the file path and launch a race condition or symlink attack</value>
+  </data>
+  <data name="SEC008_Description" xml:space="preserve">
+    <value>Use Path.GetTempFileName() or Path.Combine(Path.GetTempPath(), Path.GetRandomFileName()) to generate an unpredictable temporary file name.</value>
+  </data>
+  <data name="SEC009_Title" xml:space="preserve">
+    <value>Unsafe reflection usage</value>
+  </data>
+  <data name="SEC009_MessageFormat" xml:space="preserve">
+    <value>Unsafe reflection operation detected: {0}, which may lead to arbitrary type loading or access control bypass</value>
+  </data>
+  <data name="SEC009_Description" xml:space="preserve">
+    <value>Do not use user input to dynamically load types or access non-public members, as it may lead to code execution or information disclosure.</value>
+  </data>
+  <data name="SEC010_Title" xml:space="preserve">
+    <value>Thread synchronization/Race Condition risk</value>
+  </data>
+  <data name="SEC010_MessageFormat" xml:space="preserve">
+    <value>Potential race condition detected: {0}, which may lead to data inconsistency or security vulnerabilities</value>
+  </data>
+  <data name="SEC010_Description" xml:space="preserve">
+    <value>Access to shared state should be synchronized using lock, Interlocked, or thread-safe collections.</value>
+  </data>
+  <data name="SEC011_Title" xml:space="preserve">
+    <value>Unsafe IPC/Remote Call</value>
+  </data>
+  <data name="SEC011_MessageFormat" xml:space="preserve">
+    <value>Unsafe communication configuration detected: {0}, data transmission is not encrypted</value>
+  </data>
+  <data name="SEC011_Description" xml:space="preserve">
+    <value>Remote calls should use HTTPS, TLS or other encrypted transmission. Avoid using insecure bindings or HTTP endpoints.</value>
+  </data>
+
+  <data name="DLL003_Arg_Unknown" xml:space="preserve">
+    <value>Unknown DLL name</value>
+  </data>
+  <data name="DLL003_Arg_NotFound" xml:space="preserve">
+    <value>{0} (Not found in specified search paths)</value>
+  </data>
+  <data name="DLL003_Arg_InvalidSig" xml:space="preserve">
+    <value>{0} (Invalid signature / Unsigned)</value>
+  </data>
+  <data name="SEC002_Arg_Method" xml:space="preserve">
+    <value>Method {0} uses parameters that may contain user input, presenting a path traversal risk</value>
+  </data>
+  <data name="SEC002_Arg_Concat" xml:space="preserve">
+    <value>String concatenation constructs a path using values that may contain user input, presenting a path traversal risk</value>
+  </data>
+  <data name="SEC002_Arg_Interpolation" xml:space="preserve">
+    <value>String interpolation constructs a path using values that may contain user input, presenting a path traversal risk</value>
+  </data>
+  <data name="SEC003_Arg_Interpolation" xml:space="preserve">
+    <value>String interpolation ($"")</value>
+  </data>
+  <data name="SEC003_Arg_Concat" xml:space="preserve">
+    <value>String concatenation (+)</value>
+  </data>
+  <data name="SEC004_Arg_NewType" xml:space="preserve">
+    <value>new {0}() — This type has known RCE vulnerabilities</value>
+  </data>
+  <data name="SEC004_Arg_HandlingUnsafe" xml:space="preserve">
+    <value>TypeNameHandling = {0} (Only TypeNameHandling.None is safe)</value>
+  </data>
+  <data name="SEC004_Arg_HandlingRecommend" xml:space="preserve">
+    <value>TypeNameHandling = {0} (It is recommended to explicitly set it to TypeNameHandling.None)</value>
+  </data>
+  <data name="SEC005_Arg_Construct" xml:space="preserve">
+    <value>Construction</value>
+  </data>
+  <data name="SEC005_Arg_MethodCall" xml:space="preserve">
+    <value>Method call .{0}()</value>
+  </data>
+  <data name="SEC006_Arg_NewRegex" xml:space="preserve">
+    <value>new Regex(...)</value>
+  </data>
+  <data name="SEC006_Arg_StaticRegex" xml:space="preserve">
+    <value>Regex.{0}(...)</value>
+  </data>
+  <data name="SEC008_Arg_InterpPredictable" xml:space="preserve">
+    <value>String interpolation contains predictable values ({0})</value>
+  </data>
+  <data name="SEC008_Arg_InterpStructure" xml:space="preserve">
+    <value>String interpolation ($"") constructs a predictable filename structure</value>
+  </data>
+  <data name="SEC008_Arg_ConcatTimestamp" xml:space="preserve">
+    <value>String concatenation contains a timestamp ({0})</value>
+  </data>
+  <data name="SEC008_Arg_ConcatStructure" xml:space="preserve">
+    <value>String concatenation (+) constructs a predictable filename structure</value>
+  </data>
+  <data name="SEC008_Arg_FormatStructure" xml:space="preserve">
+    <value>string.Format() constructs a predictable filename structure</value>
+  </data>
+  <data name="SEC008_Arg_Timestamp1" xml:space="preserve">
+    <value>Uses timestamp ({0}), which is predictable</value>
+  </data>
+  <data name="SEC008_Arg_Timestamp2" xml:space="preserve">
+    <value>Uses timestamp ({0}), which is predictable</value>
+  </data>
+  <data name="SEC009_Arg_GetType" xml:space="preserve">
+    <value>Type.GetType() uses a non-constant parameter and may load arbitrary types</value>
+  </data>
+  <data name="SEC009_Arg_NonPublic" xml:space="preserve">
+    <value>{0}() uses BindingFlags.NonPublic to access non-public members, potentially bypassing access control</value>
+  </data>
+  <data name="SEC009_Arg_Invoke" xml:space="preserve">
+    <value>When invoking a method via reflection (MethodInfo.Invoke), ensure the method name is not user-controlled</value>
+  </data>
+  <data name="SEC010_Arg_Increment" xml:space="preserve">
+    <value>Field increment operation (++) is not atomic, use Interlocked.Increment or lock</value>
+  </data>
+  <data name="SEC010_Arg_Decrement" xml:space="preserve">
+    <value>Field decrement operation (--) is not atomic, use Interlocked.Decrement or lock</value>
+  </data>
+  <data name="SEC010_Arg_Compound" xml:space="preserve">
+    <value>Field compound assignment operation ({0}) is not atomic, use Interlocked or lock</value>
+  </data>
+  <data name="SEC010_Arg_CheckThenUse" xml:space="preserve">
+    <value>check-then-use pattern detected: Field '{0}' is modified after a condition check, presenting a race condition risk</value>
+  </data>
+  <data name="SEC010_Arg_CollectionMethod" xml:space="preserve">
+    <value>The {0}() operation of a non-thread-safe collection should be executed inside a lock, or use a Concurrent collection</value>
+  </data>
+  <data name="SEC010_Arg_CollectionIndexer" xml:space="preserve">
+    <value>Indexer assignment on a non-thread-safe collection should be executed inside a lock, or use ConcurrentDictionary</value>
+  </data>
+  <data name="SEC011_Arg_BasicHttp" xml:space="preserve">
+    <value>BasicHttpBinding does not use encryption by default, consider using WSHttpBinding or configuring Transport security mode</value>
+  </data>
+  <data name="SEC011_Arg_SecurityNone" xml:space="preserve">
+    <value>{0} uses SecurityMode.None disabling security, data will be transmitted in plaintext</value>
+  </data>
+  <data name="SEC011_Arg_HttpEndpoint" xml:space="preserve">
+    <value>HTTP endpoint address used, data transmission is unencrypted, HTTPS is recommended</value>
+  </data>
+  <data name="SEC011_Arg_GrpcHttp" xml:space="preserve">
+    <value>gRPC channel uses an HTTP address, HTTPS is recommended to enable TLS encryption</value>
+  </data>
+  <data name="SEC011_Arg_WebClientHttp" xml:space="preserve">
+    <value>WebClient.{0}() uses an HTTP URL, data transmission is unencrypted</value>
+  </data>
 </root>

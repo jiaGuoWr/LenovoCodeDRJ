@@ -223,10 +223,10 @@ namespace VSIXProject1.Localization
             switch (language)
             {
                 case SupportedLanguage.English:
-                    return "English";
+                    return GetString("Lang_English");
                 case SupportedLanguage.ChineseSimplified:
                 default:
-                    return "简体中文 (Chinese Simplified)";
+                    return GetString("Lang_Chinese");
             }
         }
 

@@ -153,4 +153,11 @@
     <value>导航到错误位置时出错: {0}</value>
   </data>
 
+
+  <data name="Lang_English" xml:space="preserve">
+    <value>英语 (English)</value>
+  </data>
+  <data name="Lang_Chinese" xml:space="preserve">
+    <value>简体中文</value>
+  </data>
 </root>

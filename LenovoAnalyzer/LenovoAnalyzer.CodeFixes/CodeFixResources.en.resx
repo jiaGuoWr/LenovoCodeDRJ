@@ -122,19 +122,25 @@
     <comment>The title of the code fix.</comment>
   </data>
 
+  
+  
+  
+  
+  
+
   <data name="CodeFix_DeleteChineseComment" xml:space="preserve">
-    <value>删除中文注释</value>
+    <value>Delete Chinese comment</value>
   </data>
   <data name="CodeFix_AddDllImportSearchPaths" xml:space="preserve">
-    <value>添加DefaultDllImportSearchPaths属性</value>
+    <value>Add DefaultDllImportSearchPaths attribute</value>
   </data>
   <data name="CodeFix_ReplaceStackTraceWithMessage" xml:space="preserve">
-    <value>将堆栈信息替换为错误消息</value>
+    <value>Replace stack trace with error message</value>
   </data>
   <data name="CodeFix_ShowDllSignatureHelp" xml:space="preserve">
-    <value>查看DLL具体安全信息帮助</value>
+    <value>View specific security information help for DLLs</value>
   </data>
   <data name="CodeFix_RemoveInvalidCommentedCode" xml:space="preserve">
-    <value>移除包含无效代码的注释</value>
+    <value>Remove comments containing invalid code</value>
   </data>
 </root>

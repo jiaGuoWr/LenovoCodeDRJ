@@ -15,18 +15,6 @@ namespace VSIXProject1
 {
     public class SummaryToolWindow : ToolWindowPane, IDisposable
     {
-        private const int HotKeyId = 0x2301;
-        private const int WmHotKey = 0x0312;
-        private const uint ModAlt = 0x0001;
-        private const uint ModControl = 0x0002;
-        private const uint VkL = 0x4C;
-
-        [DllImport("user32.dll", SetLastError = true)]
-        private static extern bool RegisterHotKey(IntPtr hWnd, int id, uint fsModifiers, uint vk);
-
-        [DllImport("user32.dll", SetLastError = true)]
-        private static extern bool UnregisterHotKey(IntPtr hWnd, int id);
-
         public SummaryWindowControl Control {
             get { return (SummaryWindowControl)this.Content; }
         }
@@ -48,8 +36,6 @@ namespace VSIXProject1
         private bool _isControlLifecycleSubscribed = false;
         private bool _isRefreshHandlerSubscribed = false;
         private bool _hasRequestedInitialRefresh = false;
-        private HwndSource _hwndSource;
-        private bool _isHotKeyRegistered;
 
         public bool IsDisposed => _isDisposed;
 
@@ -127,7 +113,6 @@ namespace VSIXProject1
                 return;
             }
 
-            EnsureHotKeyRegistered();
             UpdateGitStatus();
             if (!_hasRequestedInitialRefresh && MyToolWindowCommand.Instance != null)
             {
@@ -138,64 +123,7 @@ namespace VSIXProject1
 
         private void Control_Unloaded(object sender, System.Windows.RoutedEventArgs e)
         {
-            UnregisterSystemHotKey();
-        }
-
-        private void EnsureHotKeyRegistered()
-        {
-            try
-            {
-                if (_isHotKeyRegistered)
-                {
-                    return;
-                }
-
-                _hwndSource = PresentationSource.FromVisual(Control) as HwndSource;
-                if (_hwndSource == null || _hwndSource.Handle == IntPtr.Zero)
-                {
-                    return;
-                }
-
-                _hwndSource.AddHook(WndProc);
-                _isHotKeyRegistered = RegisterHotKey(_hwndSource.Handle, HotKeyId, ModControl | ModAlt, VkL);
-                System.Diagnostics.Debug.WriteLine($"SummaryToolWindow: RegisterHotKey result={_isHotKeyRegistered}");
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"EnsureHotKeyRegistered 错误: {ex.Message}");
-            }
-        }
-
-        private void UnregisterSystemHotKey()
-        {
-            try
-            {
-                if (_hwndSource != null)
-                {
-                    if (_isHotKeyRegistered)
-                    {
-                        UnregisterHotKey(_hwndSource.Handle, HotKeyId);
-                        _isHotKeyRegistered = false;
-                    }
-                    _hwndSource.RemoveHook(WndProc);
-                    _hwndSource = null;
-                }
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"UnregisterSystemHotKey 错误: {ex.Message}");
-            }
-        }
-
-        private IntPtr WndProc(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
-        {
-            if (msg == WmHotKey && wParam.ToInt32() == HotKeyId)
-            {
-                handled = true;
-                Control.ShowLanguageSelectionDialog();
-            }
-
-            return IntPtr.Zero;
+            // Removed hotkey unregister logic
         }
 
         // RefreshRequested 事件处理程序
@@ -426,8 +354,6 @@ namespace VSIXProject1
                         disposableControl.Dispose();
                     }
                 }
-
-                UnregisterSystemHotKey();
 
                 // 取消订阅 RefreshRequested 事件
                 if (_isRefreshHandlerSubscribed)

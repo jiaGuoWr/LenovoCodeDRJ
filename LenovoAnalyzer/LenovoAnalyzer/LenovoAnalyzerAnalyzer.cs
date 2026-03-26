@@ -17,162 +17,210 @@ using Microsoft.CodeAnalysis.Text;
 [DiagnosticAnalyzer(LanguageNames.CSharp)]
 public class LenovoQiraCodeAnalyzerAnalyzer : DiagnosticAnalyzer
 {
-    public const string DiagnosticId = "CHN001";
+        public const string DiagnosticId = "CHN001";
+    private static readonly LocalizableString CHN001_Title = new LocalizableResourceString("CHN001_Title", LenovoAnalyzer.Resources.ResourceManager, typeof(LenovoAnalyzer.Resources));
+    private static readonly LocalizableString CHN001_MessageFormat = new LocalizableResourceString("CHN001_MessageFormat", LenovoAnalyzer.Resources.ResourceManager, typeof(LenovoAnalyzer.Resources));
+    private static readonly LocalizableString CHN001_Description = new LocalizableResourceString("CHN001_Description", LenovoAnalyzer.Resources.ResourceManager, typeof(LenovoAnalyzer.Resources));
     private static readonly DiagnosticDescriptor Rule = new DiagnosticDescriptor(
         DiagnosticId,
-        "注释中包含中文内容",
-        "注释内容 '{0}' 包含中文",
+        CHN001_Title,
+        CHN001_MessageFormat,
         "CodeStyle",
         DiagnosticSeverity.Warning,
         isEnabledByDefault: true,
-        description: "代码注释中禁止包含中文文本");
+        description: CHN001_Description);
 
-    public const string MissingDllImportSearchPathsId = "DLL002";
+        public const string MissingDllImportSearchPathsId = "DLL002";
+    private static readonly LocalizableString DLL002_Title = new LocalizableResourceString("DLL002_Title", LenovoAnalyzer.Resources.ResourceManager, typeof(LenovoAnalyzer.Resources));
+    private static readonly LocalizableString DLL002_MessageFormat = new LocalizableResourceString("DLL002_MessageFormat", LenovoAnalyzer.Resources.ResourceManager, typeof(LenovoAnalyzer.Resources));
+    private static readonly LocalizableString DLL002_Description = new LocalizableResourceString("DLL002_Description", LenovoAnalyzer.Resources.ResourceManager, typeof(LenovoAnalyzer.Resources));
     private static readonly DiagnosticDescriptor MissingDllImportSearchPathsRule = new DiagnosticDescriptor(
         MissingDllImportSearchPathsId,
-        "DllImport缺少DefaultDllImportSearchPaths属性",
-        "DllImport未指定DefaultDllImportSearchPaths属性",
+        DLL002_Title,
+        DLL002_MessageFormat,
         "CodeStyle",
         DiagnosticSeverity.Warning,
         isEnabledByDefault: true,
-        description: "使用DllImport时应指定DefaultDllImportSearchPaths属性");
+        description: DLL002_Description);
 
-    public const string InvalidStackTraceUsageId = "EXC001";
+        public const string InvalidStackTraceUsageId = "EXC001";
+    private static readonly LocalizableString EXC001_Title = new LocalizableResourceString("EXC001_Title", LenovoAnalyzer.Resources.ResourceManager, typeof(LenovoAnalyzer.Resources));
+    private static readonly LocalizableString EXC001_MessageFormat = new LocalizableResourceString("EXC001_MessageFormat", LenovoAnalyzer.Resources.ResourceManager, typeof(LenovoAnalyzer.Resources));
+    private static readonly LocalizableString EXC001_Description = new LocalizableResourceString("EXC001_Description", LenovoAnalyzer.Resources.ResourceManager, typeof(LenovoAnalyzer.Resources));
     private static readonly DiagnosticDescriptor InvalidStackTraceUsageRule = new DiagnosticDescriptor(
         InvalidStackTraceUsageId,
-        "catch块中不应打印具体堆栈信息",
-        "catch块中使用了{0}获取堆栈信息，可能导致敏感信息泄露",
+        EXC001_Title,
+        EXC001_MessageFormat,
         "Security",
         DiagnosticSeverity.Warning,
         isEnabledByDefault: true,
-        description: "异常捕获时不应打印完整堆栈信息，建议仅记录必要的错误消息");
-    public const string UnsafeDllSignatureId = "DLL003";
+        description: EXC001_Description);
+        public const string UnsafeDllSignatureId = "DLL003";
+    private static readonly LocalizableString DLL003_Title = new LocalizableResourceString("DLL003_Title", LenovoAnalyzer.Resources.ResourceManager, typeof(LenovoAnalyzer.Resources));
+    private static readonly LocalizableString DLL003_MessageFormat = new LocalizableResourceString("DLL003_MessageFormat", LenovoAnalyzer.Resources.ResourceManager, typeof(LenovoAnalyzer.Resources));
+    private static readonly LocalizableString DLL003_Description = new LocalizableResourceString("DLL003_Description", LenovoAnalyzer.Resources.ResourceManager, typeof(LenovoAnalyzer.Resources));
     private static readonly DiagnosticDescriptor UnsafeDllSignatureRule = new DiagnosticDescriptor(
         UnsafeDllSignatureId,
-        "DLL签名不安全",
-        "DLL文件 '{0}'",
+        DLL003_Title,
+        DLL003_MessageFormat,
         "Security",
         DiagnosticSeverity.Warning,
         isEnabledByDefault: true,
-        description: "使用DllImport引用的DLL必须具有有效的数字签名");
-    public const string InvalidCommentedCodeId = "CODE001";
+        description: DLL003_Description);
+        public const string InvalidCommentedCodeId = "CODE001";
+    private static readonly LocalizableString CODE001_Title = new LocalizableResourceString("CODE001_Title", LenovoAnalyzer.Resources.ResourceManager, typeof(LenovoAnalyzer.Resources));
+    private static readonly LocalizableString CODE001_MessageFormat = new LocalizableResourceString("CODE001_MessageFormat", LenovoAnalyzer.Resources.ResourceManager, typeof(LenovoAnalyzer.Resources));
+    private static readonly LocalizableString CODE001_Description = new LocalizableResourceString("CODE001_Description", LenovoAnalyzer.Resources.ResourceManager, typeof(LenovoAnalyzer.Resources));
     private static readonly DiagnosticDescriptor InvalidCommentedCodeRule = new DiagnosticDescriptor(
         InvalidCommentedCodeId,
-        "注释中包含无效代码",
-        "注释内容包含无效代码: {0}",
+        CODE001_Title,
+        CODE001_MessageFormat,
         "CodeStyle",
         DiagnosticSeverity.Warning,
         isEnabledByDefault: true,
-        description: "不应保留被注释掉的无效代码片段");
-    public const string SensitiveInfoInCodeId = "SEC001";
+        description: CODE001_Description);
+        public const string SensitiveInfoInCodeId = "SEC001";
+    private static readonly LocalizableString SEC001_Title = new LocalizableResourceString("SEC001_Title", LenovoAnalyzer.Resources.ResourceManager, typeof(LenovoAnalyzer.Resources));
+    private static readonly LocalizableString SEC001_MessageFormat = new LocalizableResourceString("SEC001_MessageFormat", LenovoAnalyzer.Resources.ResourceManager, typeof(LenovoAnalyzer.Resources));
+    private static readonly LocalizableString SEC001_Description = new LocalizableResourceString("SEC001_Description", LenovoAnalyzer.Resources.ResourceManager, typeof(LenovoAnalyzer.Resources));
     private static readonly DiagnosticDescriptor SensitiveInfoInCodeRule = new DiagnosticDescriptor(
         SensitiveInfoInCodeId,
-        "代码中存在明文存储的敏感信息",
-        "检测到敏感信息: {0} = \"{1}\"",
+        SEC001_Title,
+        SEC001_MessageFormat,
         "Security",
         DiagnosticSeverity.Warning,
         isEnabledByDefault: true,
-        description: "不应在代码中明文存储密码、Token、密钥等敏感信息，建议使用配置文件或环境变量");
+        description: SEC001_Description);
 
-    public const string PathTraversalId = "SEC002";
+        public const string PathTraversalId = "SEC002";
+    private static readonly LocalizableString SEC002_Title = new LocalizableResourceString("SEC002_Title", LenovoAnalyzer.Resources.ResourceManager, typeof(LenovoAnalyzer.Resources));
+    private static readonly LocalizableString SEC002_MessageFormat = new LocalizableResourceString("SEC002_MessageFormat", LenovoAnalyzer.Resources.ResourceManager, typeof(LenovoAnalyzer.Resources));
+    private static readonly LocalizableString SEC002_Description = new LocalizableResourceString("SEC002_Description", LenovoAnalyzer.Resources.ResourceManager, typeof(LenovoAnalyzer.Resources));
     private static readonly DiagnosticDescriptor PathTraversalRule = new DiagnosticDescriptor(
         PathTraversalId,
-        "不受控制的搜索路径（路径遍历风险）",
-        "检测到不受控制的搜索路径: {0}",
+        SEC002_Title,
+        SEC002_MessageFormat,
         "Security",
         DiagnosticSeverity.Warning,
         isEnabledByDefault: true,
-        description: "永远不要直接使用用户输入作为路径，可能导致路径遍历攻击。应验证路径是否在允许的目录内");
+        description: SEC002_Description);
 
-    public const string SqlInjectionId = "SEC003";
+        public const string SqlInjectionId = "SEC003";
+    private static readonly LocalizableString SEC003_Title = new LocalizableResourceString("SEC003_Title", LenovoAnalyzer.Resources.ResourceManager, typeof(LenovoAnalyzer.Resources));
+    private static readonly LocalizableString SEC003_MessageFormat = new LocalizableResourceString("SEC003_MessageFormat", LenovoAnalyzer.Resources.ResourceManager, typeof(LenovoAnalyzer.Resources));
+    private static readonly LocalizableString SEC003_Description = new LocalizableResourceString("SEC003_Description", LenovoAnalyzer.Resources.ResourceManager, typeof(LenovoAnalyzer.Resources));
     private static readonly DiagnosticDescriptor SqlInjectionRule = new DiagnosticDescriptor(
         SqlInjectionId,
-        "潜在的SQL注入风险",
-        "检测到通过{0}动态构建SQL语句，存在SQL注入风险: {1}",
+        SEC003_Title,
+        SEC003_MessageFormat,
         "Security",
         DiagnosticSeverity.Warning,
         isEnabledByDefault: true,
-        description: "不应使用字符串拼接或插值动态构建SQL语句，建议使用参数化查询或ORM框架");
+        description: SEC003_Description);
 
-    public const string UnsafeDeserializationId = "SEC004";
+        public const string UnsafeDeserializationId = "SEC004";
+    private static readonly LocalizableString SEC004_Title = new LocalizableResourceString("SEC004_Title", LenovoAnalyzer.Resources.ResourceManager, typeof(LenovoAnalyzer.Resources));
+    private static readonly LocalizableString SEC004_MessageFormat = new LocalizableResourceString("SEC004_MessageFormat", LenovoAnalyzer.Resources.ResourceManager, typeof(LenovoAnalyzer.Resources));
+    private static readonly LocalizableString SEC004_Description = new LocalizableResourceString("SEC004_Description", LenovoAnalyzer.Resources.ResourceManager, typeof(LenovoAnalyzer.Resources));
     private static readonly DiagnosticDescriptor UnsafeDeserializationRule = new DiagnosticDescriptor(
         UnsafeDeserializationId,
-        "使用了不安全的反序列化方式",
-        "检测到不安全的反序列化操作: {0}，可能导致远程代码执行（RCE）漏洞",
+        SEC004_Title,
+        SEC004_MessageFormat,
         "Security",
         DiagnosticSeverity.Warning,
         isEnabledByDefault: true,
-        description: "BinaryFormatter和JavaScriptSerializer存在反序列化漏洞，建议使用System.Text.Json，若使用Newtonsoft.Json须设置TypeNameHandling.None");
+        description: SEC004_Description);
 
-    public const string InsecureRandomId = "SEC005";
+        public const string InsecureRandomId = "SEC005";
+    private static readonly LocalizableString SEC005_Title = new LocalizableResourceString("SEC005_Title", LenovoAnalyzer.Resources.ResourceManager, typeof(LenovoAnalyzer.Resources));
+    private static readonly LocalizableString SEC005_MessageFormat = new LocalizableResourceString("SEC005_MessageFormat", LenovoAnalyzer.Resources.ResourceManager, typeof(LenovoAnalyzer.Resources));
+    private static readonly LocalizableString SEC005_Description = new LocalizableResourceString("SEC005_Description", LenovoAnalyzer.Resources.ResourceManager, typeof(LenovoAnalyzer.Resources));
     private static readonly DiagnosticDescriptor InsecureRandomRule = new DiagnosticDescriptor(
         InsecureRandomId,
-        "使用了密码学不安全的随机数生成器",
-        "检测到使用 System.Random {0}，不适用于安全场景（如令牌、密钥生成），建议改用 RandomNumberGenerator",
+        SEC005_Title,
+        SEC005_MessageFormat,
         "Security",
         DiagnosticSeverity.Warning,
         isEnabledByDefault: true,
-        description: "System.Random使用伪随机算法，不具备密码学安全性，在生成令牌、密钥、验证码等安全敏感场景下必须使用RandomNumberGenerator");
+        description: SEC005_Description);
 
-    public const string RegexDosId = "SEC006";
+        public const string RegexDosId = "SEC006";
+    private static readonly LocalizableString SEC006_Title = new LocalizableResourceString("SEC006_Title", LenovoAnalyzer.Resources.ResourceManager, typeof(LenovoAnalyzer.Resources));
+    private static readonly LocalizableString SEC006_MessageFormat = new LocalizableResourceString("SEC006_MessageFormat", LenovoAnalyzer.Resources.ResourceManager, typeof(LenovoAnalyzer.Resources));
+    private static readonly LocalizableString SEC006_Description = new LocalizableResourceString("SEC006_Description", LenovoAnalyzer.Resources.ResourceManager, typeof(LenovoAnalyzer.Resources));
     private static readonly DiagnosticDescriptor RegexDosRule = new DiagnosticDescriptor(
         RegexDosId,
-        "正则表达式缺少超时参数（ReDoS风险）",
-        "检测到 {0} 未设置超时参数，复杂正则表达式可能导致正则表达式拒绝服务（ReDoS）攻击",
+        SEC006_Title,
+        SEC006_MessageFormat,
         "Security",
         DiagnosticSeverity.Warning,
         isEnabledByDefault: true,
-        description: "使用Regex时应始终指定matchTimeout参数，防止恶意输入导致回溯爆炸式增长造成DoS攻击");
+        description: SEC006_Description);
 
-    public const string ResourceLeakId = "SEC007";
+        public const string ResourceLeakId = "SEC007";
+    private static readonly LocalizableString SEC007_Title = new LocalizableResourceString("SEC007_Title", LenovoAnalyzer.Resources.ResourceManager, typeof(LenovoAnalyzer.Resources));
+    private static readonly LocalizableString SEC007_MessageFormat = new LocalizableResourceString("SEC007_MessageFormat", LenovoAnalyzer.Resources.ResourceManager, typeof(LenovoAnalyzer.Resources));
+    private static readonly LocalizableString SEC007_Description = new LocalizableResourceString("SEC007_Description", LenovoAnalyzer.Resources.ResourceManager, typeof(LenovoAnalyzer.Resources));
     private static readonly DiagnosticDescriptor ResourceLeakRule = new DiagnosticDescriptor(
         ResourceLeakId,
-        "IDisposable资源未使用using语句管理（资源泄漏风险）",
-        "'{0}' 实现了IDisposable接口，创建后应使用using语句或using声明确保资源被释放",
+        SEC007_Title,
+        SEC007_MessageFormat,
         "Security",
         DiagnosticSeverity.Warning,
         isEnabledByDefault: true,
-        description: "数据库连接、文件流、HttpClient等资源未正确释放会导致连接池耗尽、文件句柄泄漏等问题");
+        description: SEC007_Description);
 
-    public const string InsecureTempFileId = "SEC008";
+        public const string InsecureTempFileId = "SEC008";
+    private static readonly LocalizableString SEC008_Title = new LocalizableResourceString("SEC008_Title", LenovoAnalyzer.Resources.ResourceManager, typeof(LenovoAnalyzer.Resources));
+    private static readonly LocalizableString SEC008_MessageFormat = new LocalizableResourceString("SEC008_MessageFormat", LenovoAnalyzer.Resources.ResourceManager, typeof(LenovoAnalyzer.Resources));
+    private static readonly LocalizableString SEC008_Description = new LocalizableResourceString("SEC008_Description", LenovoAnalyzer.Resources.ResourceManager, typeof(LenovoAnalyzer.Resources));
     private static readonly DiagnosticDescriptor InsecureTempFileRule = new DiagnosticDescriptor(
         InsecureTempFileId,
-        "使用了可预测的临时文件名（竞争条件/文件枚举风险）",
-        "检测到使用可预测方式({0})构造临时文件名，攻击者可预测文件路径发动竞争条件或符号链接攻击",
+        SEC008_Title,
+        SEC008_MessageFormat,
         "Security",
         DiagnosticSeverity.Warning,
         isEnabledByDefault: true,
-        description: "应使用Path.GetTempFileName()或Path.Combine(Path.GetTempPath(), Path.GetRandomFileName())生成不可预测的临时文件名。");
+        description: SEC008_Description);
 
-    public const string UnsafeReflectionId = "SEC009";
+        public const string UnsafeReflectionId = "SEC009";
+    private static readonly LocalizableString SEC009_Title = new LocalizableResourceString("SEC009_Title", LenovoAnalyzer.Resources.ResourceManager, typeof(LenovoAnalyzer.Resources));
+    private static readonly LocalizableString SEC009_MessageFormat = new LocalizableResourceString("SEC009_MessageFormat", LenovoAnalyzer.Resources.ResourceManager, typeof(LenovoAnalyzer.Resources));
+    private static readonly LocalizableString SEC009_Description = new LocalizableResourceString("SEC009_Description", LenovoAnalyzer.Resources.ResourceManager, typeof(LenovoAnalyzer.Resources));
     private static readonly DiagnosticDescriptor UnsafeReflectionRule = new DiagnosticDescriptor(
         UnsafeReflectionId,
-        "不安全的反射使用",
-        "检测到不安全的反射操作: {0}，可能导致任意类型加载或访问控制绕过",
+        SEC009_Title,
+        SEC009_MessageFormat,
         "Security",
         DiagnosticSeverity.Warning,
         isEnabledByDefault: true,
-        description: "不应使用用户输入动态加载类型或访问非公开成员，可能导致代码执行或信息泄露。");
+        description: SEC009_Description);
 
-    public const string RaceConditionId = "SEC010";
+        public const string RaceConditionId = "SEC010";
+    private static readonly LocalizableString SEC010_Title = new LocalizableResourceString("SEC010_Title", LenovoAnalyzer.Resources.ResourceManager, typeof(LenovoAnalyzer.Resources));
+    private static readonly LocalizableString SEC010_MessageFormat = new LocalizableResourceString("SEC010_MessageFormat", LenovoAnalyzer.Resources.ResourceManager, typeof(LenovoAnalyzer.Resources));
+    private static readonly LocalizableString SEC010_Description = new LocalizableResourceString("SEC010_Description", LenovoAnalyzer.Resources.ResourceManager, typeof(LenovoAnalyzer.Resources));
     private static readonly DiagnosticDescriptor RaceConditionRule = new DiagnosticDescriptor(
         RaceConditionId,
-        "线程同步/竞争条件风险",
-        "检测到潜在的竞争条件: {0}，可能导致数据不一致或安全漏洞",
+        SEC010_Title,
+        SEC010_MessageFormat,
         "Security",
         DiagnosticSeverity.Warning,
         isEnabledByDefault: true,
-        description: "共享状态的访问应使用lock、Interlocked或线程安全集合进行同步。");
+        description: SEC010_Description);
 
-    public const string InsecureIpcId = "SEC011";
+        public const string InsecureIpcId = "SEC011";
+    private static readonly LocalizableString SEC011_Title = new LocalizableResourceString("SEC011_Title", LenovoAnalyzer.Resources.ResourceManager, typeof(LenovoAnalyzer.Resources));
+    private static readonly LocalizableString SEC011_MessageFormat = new LocalizableResourceString("SEC011_MessageFormat", LenovoAnalyzer.Resources.ResourceManager, typeof(LenovoAnalyzer.Resources));
+    private static readonly LocalizableString SEC011_Description = new LocalizableResourceString("SEC011_Description", LenovoAnalyzer.Resources.ResourceManager, typeof(LenovoAnalyzer.Resources));
     private static readonly DiagnosticDescriptor InsecureIpcRule = new DiagnosticDescriptor(
         InsecureIpcId,
-        "不安全的IPC/远程调用",
-        "检测到不安全的通信配置: {0}，数据传输未加密",
+        SEC011_Title,
+        SEC011_MessageFormat,
         "Security",
         DiagnosticSeverity.Warning,
         isEnabledByDefault: true,
-        description: "远程调用应使用HTTPS、TLS或其他加密传输，避免使用不安全的绑定或HTTP端点。");
+        description: SEC011_Description);
 
     public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics
         => ImmutableArray.Create(
@@ -385,7 +433,7 @@ public class LenovoQiraCodeAnalyzerAnalyzer : DiagnosticAnalyzer
                 context.ReportDiagnostic(Diagnostic.Create(
                     UnsafeDllSignatureRule,
                     dllImportAttr.GetLocation(),
-                    "未知DLL名称"));
+                    new LocalizableArgument("DLL003_Arg_Unknown")));
                 continue;
             }
 
@@ -399,7 +447,7 @@ public class LenovoQiraCodeAnalyzerAnalyzer : DiagnosticAnalyzer
                 context.ReportDiagnostic(Diagnostic.Create(
                     UnsafeDllSignatureRule,
                     dllImportAttr.GetLocation(),
-                    $"{dllName}（在指定搜索路径中未找到）"));
+                    new LocalizableArgument("DLL003_Arg_NotFound", dllName)));
                 continue;
             }
 
@@ -408,7 +456,7 @@ public class LenovoQiraCodeAnalyzerAnalyzer : DiagnosticAnalyzer
                 context.ReportDiagnostic(Diagnostic.Create(
                     UnsafeDllSignatureRule,
                     dllImportAttr.GetLocation(),
-                    $"{dllName}（签名无效/未签名）"));
+                    new LocalizableArgument("DLL003_Arg_InvalidSig", dllName)));
             }
         }
     }
@@ -964,7 +1012,7 @@ public class LenovoQiraCodeAnalyzerAnalyzer : DiagnosticAnalyzer
                 context.ReportDiagnostic(Diagnostic.Create(
                     PathTraversalRule,
                     arg.GetLocation(),
-                    $"方法 {methodName} 使用了可能包含用户输入的参数，存在路径遍历风险"));
+                    new LocalizableArgument("SEC002_Arg_Method", methodName)));
                 return;
             }
         }
@@ -990,7 +1038,7 @@ public class LenovoQiraCodeAnalyzerAnalyzer : DiagnosticAnalyzer
                 context.ReportDiagnostic(Diagnostic.Create(
                     PathTraversalRule,
                     binaryExpr.GetLocation(),
-                    "字符串拼接构造路径时使用了可能包含用户输入的值，存在路径遍历风险"));
+                    new LocalizableArgument("SEC002_Arg_Concat")));
             }
         }
     }
@@ -1017,7 +1065,7 @@ public class LenovoQiraCodeAnalyzerAnalyzer : DiagnosticAnalyzer
                 context.ReportDiagnostic(Diagnostic.Create(
                     PathTraversalRule,
                     interp.GetLocation(),
-                    "字符串插值构造路径时使用了可能包含用户输入的值，存在路径遍历风险"));
+                    new LocalizableArgument("SEC002_Arg_Interpolation")));
                 return;
             }
         }
@@ -1176,11 +1224,11 @@ public class LenovoQiraCodeAnalyzerAnalyzer : DiagnosticAnalyzer
     /// <summary>
     /// 判断表达式是否为字符串拼接或插值，返回构建方式描述，否则返回null
     /// </summary>
-    private string GetStringBuildMethod(ExpressionSyntax expression)
+    private LocalizableArgument GetStringBuildMethod(ExpressionSyntax expression)
     {
         // 字符串插值: $"SELECT {id}"
         if (expression is InterpolatedStringExpressionSyntax)
-            return "字符串插值($\"\")";
+            return new LocalizableArgument("SEC003_Arg_Interpolation");
 
         // 字符串拼接: "SELECT " + userInput
         if (expression is BinaryExpressionSyntax binary &&
@@ -1192,7 +1240,7 @@ public class LenovoQiraCodeAnalyzerAnalyzer : DiagnosticAnalyzer
             if (leftIsLiteral && rightIsLiteral)
                 return null; // 两侧都是字面量，是安全的常量拼接
             if (leftIsLiteral || rightIsLiteral)
-                return "字符串拼接(+)";
+                return new LocalizableArgument("SEC003_Arg_Concat");
         }
 
         return null;
@@ -1219,7 +1267,7 @@ public class LenovoQiraCodeAnalyzerAnalyzer : DiagnosticAnalyzer
             return;
 
         var firstArg = objectCreation.ArgumentList.Arguments[0].Expression;
-        string buildMethod = GetStringBuildMethod(firstArg);
+        LocalizableArgument buildMethod = GetStringBuildMethod(firstArg);
         if (buildMethod == null)
             return;
 
@@ -1243,7 +1291,7 @@ public class LenovoQiraCodeAnalyzerAnalyzer : DiagnosticAnalyzer
         if (!memberAccess.Name.Identifier.Text.Equals("CommandText", StringComparison.Ordinal))
             return;
 
-        string buildMethod = GetStringBuildMethod(assignment.Right);
+        LocalizableArgument buildMethod = GetStringBuildMethod(assignment.Right);
         if (buildMethod == null)
             return;
 
@@ -1283,7 +1331,7 @@ public class LenovoQiraCodeAnalyzerAnalyzer : DiagnosticAnalyzer
             return;
 
         var firstArg = invocation.ArgumentList.Arguments[0].Expression;
-        string buildMethod = GetStringBuildMethod(firstArg);
+        LocalizableArgument buildMethod = GetStringBuildMethod(firstArg);
         if (buildMethod == null)
             return;
 
@@ -1311,7 +1359,7 @@ public class LenovoQiraCodeAnalyzerAnalyzer : DiagnosticAnalyzer
             context.ReportDiagnostic(Diagnostic.Create(
                 UnsafeDeserializationRule,
                 objectCreation.GetLocation(),
-                $"new {typeName}() — 该类型存在已知RCE漏洞"));
+                new LocalizableArgument("SEC004_Arg_NewType", typeName)));
         }
     }
 
@@ -1346,7 +1394,7 @@ public class LenovoQiraCodeAnalyzerAnalyzer : DiagnosticAnalyzer
                 context.ReportDiagnostic(Diagnostic.Create(
                     UnsafeDeserializationRule,
                     assignment.GetLocation(),
-                    $"TypeNameHandling = {rightText}（仅TypeNameHandling.None是安全的）"));
+                    new LocalizableArgument("SEC004_Arg_HandlingUnsafe", rightText)));
                 return;
             }
         }
@@ -1357,7 +1405,7 @@ public class LenovoQiraCodeAnalyzerAnalyzer : DiagnosticAnalyzer
             context.ReportDiagnostic(Diagnostic.Create(
                 UnsafeDeserializationRule,
                 assignment.GetLocation(),
-                $"TypeNameHandling = {rightText}（建议显式设置为TypeNameHandling.None）"));
+                new LocalizableArgument("SEC004_Arg_HandlingRecommend", rightText)));
         }
     }
 
@@ -1388,7 +1436,7 @@ public class LenovoQiraCodeAnalyzerAnalyzer : DiagnosticAnalyzer
         context.ReportDiagnostic(Diagnostic.Create(
             InsecureRandomRule,
             objectCreation.GetLocation(),
-            "构造"));
+            new LocalizableArgument("SEC005_Arg_Construct")));
     }
 
     /// <summary>
@@ -1415,7 +1463,7 @@ public class LenovoQiraCodeAnalyzerAnalyzer : DiagnosticAnalyzer
             context.ReportDiagnostic(Diagnostic.Create(
                 InsecureRandomRule,
                 invocation.GetLocation(),
-                $"方法调用 .{methodName}()"));
+                new LocalizableArgument("SEC005_Arg_MethodCall", methodName)));
         }
     }
 
@@ -1450,7 +1498,7 @@ public class LenovoQiraCodeAnalyzerAnalyzer : DiagnosticAnalyzer
         context.ReportDiagnostic(Diagnostic.Create(
             RegexDosRule,
             objectCreation.GetLocation(),
-            "new Regex(...)"));
+            new LocalizableArgument("SEC006_Arg_NewRegex")));
     }
 
     /// <summary>
@@ -1507,7 +1555,7 @@ public class LenovoQiraCodeAnalyzerAnalyzer : DiagnosticAnalyzer
             context.ReportDiagnostic(Diagnostic.Create(
                 RegexDosRule,
                 invocation.GetLocation(),
-                $"Regex.{methodName}(...)"));
+                new LocalizableArgument("SEC006_Arg_StaticRegex", methodName)));
         }
     }
 
@@ -1633,7 +1681,7 @@ public class LenovoQiraCodeAnalyzerAnalyzer : DiagnosticAnalyzer
     /// <summary>
     /// 识别可预测的临时文件名构造模式，返回模式描述；若是安全模式则返回null
     /// </summary>
-    private string GetPredictableTempFilePattern(ExpressionSyntax expression)
+    private LocalizableArgument GetPredictableTempFilePattern(ExpressionSyntax expression)
     {
         // 先排除安全的随机文件名生成方式
         if (IsSafeRandomFileName(expression))
@@ -1648,10 +1696,10 @@ public class LenovoQiraCodeAnalyzerAnalyzer : DiagnosticAnalyzer
                 {
                     string interpText = interp.Expression.ToString();
                     if (IsDateTimeExpression(interpText) || IsSequentialIdExpression(interp.Expression))
-                        return $"字符串插值包含可预测值({TruncateLongText(interpText, 30)})";
+                        return new LocalizableArgument("SEC008_Arg_InterpPredictable", TruncateLongText(interpText, 30));
                 }
             }
-            return "字符串插值($\"\")构造的文件名结构可预测";
+            return new LocalizableArgument("SEC008_Arg_InterpStructure");
         }
 
         // 模式2：字符串拼接 "prefix_" + something
@@ -1660,8 +1708,8 @@ public class LenovoQiraCodeAnalyzerAnalyzer : DiagnosticAnalyzer
         {
             string binaryText = expression.ToString();
             if (IsDateTimeExpression(binaryText))
-                return $"字符串拼接包含时间戳({TruncateLongText(binaryText, 30)})";
-            return "字符串拼接(+)构造的文件名结构可预测";
+                return new LocalizableArgument("SEC008_Arg_ConcatTimestamp", TruncateLongText(binaryText, 30));
+            return new LocalizableArgument("SEC008_Arg_ConcatStructure");
         }
 
         // 模式3：string.Format(...)
@@ -1670,10 +1718,10 @@ public class LenovoQiraCodeAnalyzerAnalyzer : DiagnosticAnalyzer
             string invocText = expression.ToString();
             if (invocText.StartsWith("string.Format", StringComparison.OrdinalIgnoreCase) ||
                 invocText.StartsWith("String.Format", StringComparison.OrdinalIgnoreCase))
-                return "string.Format()构造的文件名结构可预测";
+                return new LocalizableArgument("SEC008_Arg_FormatStructure");
 
             if (IsDateTimeExpression(invocText))
-                return "使用了时间戳(" + TruncateLongText(invocText, 30) + ")，时间戳可预测";
+                return new LocalizableArgument("SEC008_Arg_Timestamp1", TruncateLongText(invocText, 30));
         }
 
         // 模式4：直接的成员访问表达式（DateTime.Now.Ticks 等）
@@ -1681,7 +1729,7 @@ public class LenovoQiraCodeAnalyzerAnalyzer : DiagnosticAnalyzer
         {
             string maText = expression.ToString();
             if (IsDateTimeExpression(maText))
-                return "使用了时间戳(" + TruncateLongText(maText, 30) + ")，时间戳可预测";
+                return new LocalizableArgument("SEC008_Arg_Timestamp2", TruncateLongText(maText, 30));
         }
 
         return null;
@@ -1732,7 +1780,7 @@ public class LenovoQiraCodeAnalyzerAnalyzer : DiagnosticAnalyzer
         // 检查后续参数中是否有可预测的文件名构造方式
         for (int i = 1; i < args.Count; i++)
         {
-            string predictablePattern = GetPredictableTempFilePattern(args[i].Expression);
+            LocalizableArgument predictablePattern = GetPredictableTempFilePattern(args[i].Expression);
             if (predictablePattern != null)
             {
                 context.ReportDiagnostic(Diagnostic.Create(
@@ -1775,7 +1823,7 @@ public class LenovoQiraCodeAnalyzerAnalyzer : DiagnosticAnalyzer
                         context.ReportDiagnostic(Diagnostic.Create(
                             UnsafeReflectionRule,
                             invocation.GetLocation(),
-                            "Type.GetType() 使用了非常量参数，可能加载任意类型"));
+                            new LocalizableArgument("SEC009_Arg_GetType")));
                     }
                 }
             }
@@ -1796,7 +1844,7 @@ public class LenovoQiraCodeAnalyzerAnalyzer : DiagnosticAnalyzer
                         context.ReportDiagnostic(Diagnostic.Create(
                             UnsafeReflectionRule,
                             invocation.GetLocation(),
-                            $"{methodName}() 使用 BindingFlags.NonPublic 访问非公开成员，可能绕过访问控制"));
+                            new LocalizableArgument("SEC009_Arg_NonPublic", methodName)));
                         return;
                     }
                 }
@@ -1812,7 +1860,7 @@ public class LenovoQiraCodeAnalyzerAnalyzer : DiagnosticAnalyzer
                 context.ReportDiagnostic(Diagnostic.Create(
                     UnsafeReflectionRule,
                     invocation.GetLocation(),
-                    "通过反射调用方法 (MethodInfo.Invoke)，应确保方法名不受用户控制"));
+                    new LocalizableArgument("SEC009_Arg_Invoke")));
             }
         }
     }
@@ -1854,7 +1902,7 @@ public class LenovoQiraCodeAnalyzerAnalyzer : DiagnosticAnalyzer
         context.ReportDiagnostic(Diagnostic.Create(
             RaceConditionRule,
             increment.GetLocation(),
-            "字段自增操作 (++) 不是原子操作，应使用 Interlocked.Increment 或 lock"));
+            new LocalizableArgument("SEC010_Arg_Increment")));
     }
 
     /// <summary>
@@ -1879,7 +1927,7 @@ public class LenovoQiraCodeAnalyzerAnalyzer : DiagnosticAnalyzer
         context.ReportDiagnostic(Diagnostic.Create(
             RaceConditionRule,
             decrement.GetLocation(),
-            "字段自减操作 (--) 不是原子操作，应使用 Interlocked.Decrement 或 lock"));
+            new LocalizableArgument("SEC010_Arg_Decrement")));
     }
 
     /// <summary>
@@ -1896,7 +1944,7 @@ public class LenovoQiraCodeAnalyzerAnalyzer : DiagnosticAnalyzer
         context.ReportDiagnostic(Diagnostic.Create(
             RaceConditionRule,
             assignment.GetLocation(),
-            $"字段复合赋值操作 ({opText}) 不是原子操作，应使用 Interlocked 或 lock"));
+            new LocalizableArgument("SEC010_Arg_Compound", opText)));
     }
 
     /// <summary>
@@ -1924,7 +1972,7 @@ public class LenovoQiraCodeAnalyzerAnalyzer : DiagnosticAnalyzer
                 context.ReportDiagnostic(Diagnostic.Create(
                     RaceConditionRule,
                     ifStatement.GetLocation(),
-                    $"检测到 check-then-use 模式：字段 '{field}' 在条件检查后被修改，存在竞争条件风险"));
+                    new LocalizableArgument("SEC010_Arg_CheckThenUse", field)));
                 return;
             }
         }
@@ -1963,7 +2011,7 @@ public class LenovoQiraCodeAnalyzerAnalyzer : DiagnosticAnalyzer
                     context.ReportDiagnostic(Diagnostic.Create(
                         RaceConditionRule,
                         invocation.GetLocation(),
-                        $"非线程安全集合的 {methodName}() 操作应在 lock 内执行，或改用 Concurrent 集合"));
+                        new LocalizableArgument("SEC010_Arg_CollectionMethod", methodName)));
                     return;
                 }
             }
@@ -2093,7 +2141,7 @@ public class LenovoQiraCodeAnalyzerAnalyzer : DiagnosticAnalyzer
         context.ReportDiagnostic(Diagnostic.Create(
             RaceConditionRule,
             assignment.GetLocation(),
-            "非线程安全集合的索引器赋值操作应在 lock 内执行，或改用 ConcurrentDictionary"));
+            new LocalizableArgument("SEC010_Arg_CollectionIndexer")));
     }
 
     /// <summary>
@@ -2152,7 +2200,7 @@ public class LenovoQiraCodeAnalyzerAnalyzer : DiagnosticAnalyzer
                 context.ReportDiagnostic(Diagnostic.Create(
                     InsecureIpcRule,
                     objectCreation.GetLocation(),
-                    "BasicHttpBinding 默认不使用加密，建议使用 WSHttpBinding 或配置 Transport 安全模式"));
+                    new LocalizableArgument("SEC011_Arg_BasicHttp")));
                 return;
             }
         }
@@ -2169,7 +2217,7 @@ public class LenovoQiraCodeAnalyzerAnalyzer : DiagnosticAnalyzer
                     context.ReportDiagnostic(Diagnostic.Create(
                         InsecureIpcRule,
                         objectCreation.GetLocation(),
-                        $"{typeName} 使用 SecurityMode.None 禁用了安全，数据将以明文传输"));
+                        new LocalizableArgument("SEC011_Arg_SecurityNone", typeName)));
                 }
             }
         }
@@ -2195,7 +2243,7 @@ public class LenovoQiraCodeAnalyzerAnalyzer : DiagnosticAnalyzer
                     context.ReportDiagnostic(Diagnostic.Create(
                         InsecureIpcRule,
                         objectCreation.GetLocation(),
-                        "使用 HTTP 端点地址，数据传输未加密，建议使用 HTTPS"));
+                        new LocalizableArgument("SEC011_Arg_HttpEndpoint")));
                 }
             }
         }
@@ -2227,7 +2275,7 @@ public class LenovoQiraCodeAnalyzerAnalyzer : DiagnosticAnalyzer
                         context.ReportDiagnostic(Diagnostic.Create(
                             InsecureIpcRule,
                             invocation.GetLocation(),
-                            "gRPC 通道使用 HTTP 地址，建议使用 HTTPS 以启用 TLS 加密"));
+                            new LocalizableArgument("SEC011_Arg_GrpcHttp")));
                     }
                 }
             }
@@ -2247,7 +2295,7 @@ public class LenovoQiraCodeAnalyzerAnalyzer : DiagnosticAnalyzer
                     context.ReportDiagnostic(Diagnostic.Create(
                         InsecureIpcRule,
                         invocation.GetLocation(),
-                        $"WebClient.{methodName}() 使用 HTTP URL，数据传输未加密"));
+                        new LocalizableArgument("SEC011_Arg_WebClientHttp", methodName)));
                 }
             }
         }
@@ -2270,5 +2318,32 @@ public class LenovoQiraCodeAnalyzerAnalyzer : DiagnosticAnalyzer
             return false; // 无法在编译时确定变量值，不报告
 
         return false;
+    }
+
+    internal class LocalizableArgument : IFormattable
+    {
+        private readonly string _key;
+        private readonly object[] _args;
+
+        public LocalizableArgument(string key, params object[] args)
+        {
+            _key = key;
+            _args = args;
+        }
+
+        public override string ToString() => ToString(null, null);
+
+        public string ToString(string format, IFormatProvider formatProvider)
+        {
+            var culture = formatProvider as System.Globalization.CultureInfo;
+            string localizedString = LenovoAnalyzer.Resources.ResourceManager.GetString(_key, culture);
+            if (string.IsNullOrEmpty(localizedString)) localizedString = _key;
+            
+            if (_args != null && _args.Length > 0)
+            {
+                return string.Format(culture, localizedString, _args);
+            }
+            return localizedString;
+        }
     }
 }

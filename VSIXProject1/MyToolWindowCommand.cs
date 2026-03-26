@@ -98,6 +98,8 @@ namespace VSIXProject1
     internal sealed class MyToolWindowCommand
     {
         public const int CommandId = 0x0100;
+        public const int LanguageCommandId = 0x0101;
+        public const int TopLevelMenuId = 0x1021;
         public static readonly Guid CommandSet = new Guid("89D89890-7000-4008-8000-000000000001");
 
         private readonly AsyncPackage package;
@@ -107,9 +109,38 @@ namespace VSIXProject1
             this.package = package ?? throw new ArgumentNullException(nameof(package));
             commandService = commandService ?? throw new ArgumentNullException(nameof(commandService));
 
-            var menuCommandID = new CommandID(new Guid("89D89890-7000-4008-8000-000000000001"), 0x0100);
-            var menuItem = new MenuCommand(this.Execute, menuCommandID);
+            var topMenuCommandID = new CommandID(CommandSet, TopLevelMenuId);
+            var topMenuItem = new OleMenuCommand(null, topMenuCommandID);
+            topMenuItem.BeforeQueryStatus += (s, e) =>
+            {
+                if (s is OleMenuCommand cmd)
+                {
+                    cmd.Text = LocalizationService.GetString("Menu_CodeIssueSummary");
+                }
+            };
+            commandService.AddCommand(topMenuItem);
+
+            var menuCommandID = new CommandID(CommandSet, CommandId);
+            var menuItem = new OleMenuCommand(this.Execute, menuCommandID);
+            menuItem.BeforeQueryStatus += (s, e) =>
+            {
+                if (s is OleMenuCommand cmd)
+                {
+                    cmd.Text = LocalizationService.GetString("Menu_CodeIssueSummary");
+                }
+            };
             commandService.AddCommand(menuItem);
+
+            var langCommandID = new CommandID(CommandSet, LanguageCommandId);
+            var langMenuItem = new OleMenuCommand(this.ExecuteLanguageSettings, langCommandID);
+            langMenuItem.BeforeQueryStatus += (s, e) =>
+            {
+                if (s is OleMenuCommand cmd)
+                {
+                    cmd.Text = LocalizationService.GetString("Menu_LanguageSettings");
+                }
+            };
+            commandService.AddCommand(langMenuItem);
         }
 
         public static MyToolWindowCommand Instance { get; private set; }
@@ -352,6 +383,34 @@ namespace VSIXProject1
                     System.Windows.MessageBox.Show($"执行命令时出错: {ex.Message}\n\n堆栈跟踪: {ex.StackTrace}", "错误", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Error);
                 }
             });
+        }
+
+        private void ExecuteLanguageSettings(object sender, EventArgs e)
+        {
+            ThreadHelper.ThrowIfNotOnUIThread();
+            try
+            {
+                var dialog = new LanguageSelectDialog(LocalizationService.CurrentLanguage);
+                // We show dialog without explicit owner since we are invoked from menu, or we could resolve main window
+                bool? result = dialog.ShowDialog();
+                if (result == true)
+                {
+                    LocalizationService.SetLanguage(dialog.SelectedLanguage, package);
+                    
+                    // Trigger refresh on active tool window if it exists
+                    var existingWindow = package.FindToolWindow(typeof(SummaryToolWindow), 0, false) as SummaryToolWindow;
+                    if (existingWindow != null && !existingWindow.IsDisposed)
+                    {
+                        // The UI texts automatically update due to TranslationProvider Refresh
+                        // We also need to refresh Git status which contains dynamic localized text
+                        existingWindow.UpdateGitStatus();
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"ExecuteLanguageSettings 出错: {ex.Message}");
+            }
         }
 
         public void RequestAnalysisRefresh(bool immediate = false)

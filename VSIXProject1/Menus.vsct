@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <CommandTable
     xmlns="http://schemas.microsoft.com/VisualStudio/2005-10-18/CommandTable"
     xmlns:xs="http://www.w3.org/2001/XMLSchema">
@@ -10,24 +10,55 @@
 		<GuidSymbol name="guidVSIXProject1Package" value="{89D89890-7000-4008-8000-000000000001}"/>
 		<GuidSymbol name="guidSummaryCommandSet" value="{89D89890-7000-4008-8000-000000000001}">
 			<IDSymbol name="MyToolMenuGroup" value="0x1020"/>
+			<IDSymbol name="MyTopLevelMenu" value="0x1021"/>
+			<IDSymbol name="MySubMenuGroup" value="0x1022"/>
 			<IDSymbol name="SummaryCommandId" value="0x0100"/>
+			<IDSymbol name="LanguageSettingsCommandId" value="0x0101"/>
 		</GuidSymbol>
 	</Symbols>
 
 	<Commands package="guidVSIXProject1Package">
 		<Groups>
+			<!-- Group on the Tools menu -->
 			<Group guid="guidSummaryCommandSet" id="MyToolMenuGroup" priority="0x0600">
 				<Parent guid="guidSHLMainMenu" id="IDM_VS_MENU_TOOLS"/>
 			</Group>
+			<!-- Group inside our TopLevelMenu -->
+			<Group guid="guidSummaryCommandSet" id="MySubMenuGroup" priority="0x0100">
+				<Parent guid="guidSummaryCommandSet" id="MyTopLevelMenu"/>
+			</Group>
 		</Groups>
 
-		<Buttons>
-			<Button guid="guidSummaryCommandSet" id="SummaryCommandId" priority="0x0100" type="Button">
+		<Menus>
+			<!-- Our TopLevelMenu, placed inside MyToolMenuGroup -->
+			<Menu guid="guidSummaryCommandSet" id="MyTopLevelMenu" priority="0x0100" type="Menu">
 				<Parent guid="guidSummaryCommandSet" id="MyToolMenuGroup"/>
-				
+				<CommandFlag>TextChanges</CommandFlag>
 				<Strings>
-					<ButtonText>代码问题汇总</ButtonText>
-					<CommandName>代码问题汇总</CommandName>
+					<ButtonText>风险代码汇总</ButtonText>
+					<CommandName>风险代码汇总</CommandName>
+				</Strings>
+			</Menu>
+		</Menus>
+
+		<Buttons>
+			<!-- Button 1: Open Tool Window -->
+			<Button guid="guidSummaryCommandSet" id="SummaryCommandId" priority="0x0100" type="Button">
+				<Parent guid="guidSummaryCommandSet" id="MySubMenuGroup"/>
+				<CommandFlag>TextChanges</CommandFlag>
+				<Strings>
+					<ButtonText>分析窗口</ButtonText>
+					<CommandName>分析窗口</CommandName>
+				</Strings>
+			</Button>
+
+			<!-- Button 2: Language Settings -->
+			<Button guid="guidSummaryCommandSet" id="LanguageSettingsCommandId" priority="0x0101" type="Button">
+				<Parent guid="guidSummaryCommandSet" id="MySubMenuGroup"/>
+				<CommandFlag>TextChanges</CommandFlag>
+				<Strings>
+					<ButtonText>语言设置 (Language)</ButtonText>
+					<CommandName>语言设置</CommandName>
 				</Strings>
 			</Button>
 		</Buttons>

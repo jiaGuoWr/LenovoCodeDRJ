@@ -24,58 +24,11 @@ namespace VSIXProject1
 
             await MyToolWindowCommand.InitializeAsync(this);
 
-            // 尝试在包初始化时显示工具窗口，保持其状态
-            await RestoreToolWindowStateAsync(cancellationToken);
-
             // 注册解决方案事件，在解决方案打开后自动执行代码分析
             IVsSolution solution = await GetServiceAsync(typeof(SVsSolution)) as IVsSolution;
             if (solution != null)
             {
                 solution.AdviseSolutionEvents(new SolutionOpenEventHandler(this), out _);
-            }
-        }
-
-        private async Task RestoreToolWindowStateAsync(CancellationToken cancellationToken)
-        {
-            await JoinableTaskFactory.SwitchToMainThreadAsync(cancellationToken);
-
-            try
-            {
-                // 显示工具窗口但不激活，保持其之前的状态
-                // 第三个参数为 false，表示如果窗口不存在则创建，但不强制显示
-                ToolWindowPane window = await ShowToolWindowAsync(typeof(SummaryToolWindow), 0, false, cancellationToken);
-                if ((null != window) && (null != window.Frame))
-                {
-                    // 窗口已存在或已创建，不需要额外操作
-                    // Visual Studio 会自动恢复其之前的停靠状态
-                    // 执行代码分析并更新窗口内容
-                    await UpdateToolWindowContentAsync(window);
-                }
-            }
-            catch (Exception ex)
-            {
-                // 忽略异常，确保包初始化不会失败
-                System.Diagnostics.Debug.WriteLine($"恢复工具窗口状态时出错: {ex.Message}");
-            }
-        }
-
-        private async Task UpdateToolWindowContentAsync(ToolWindowPane window)
-        {
-            await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
-            
-            // 检查MyToolWindowCommand.Instance是否已经初始化
-            if (MyToolWindowCommand.Instance == null)
-            {
-                return;
-            }
-            
-            // 执行代码分析
-            var diagnostics = await MyToolWindowCommand.Instance.AnalyzeSolutionAsync();
-
-            // 更新工具窗口显示
-            if (window is SummaryToolWindow summaryWindow)
-            {
-                await summaryWindow.UpdateAnalysisResultsAsync(diagnostics);
             }
         }
 
@@ -148,28 +101,27 @@ namespace VSIXProject1
             private async Task ExecuteAnalysisAsync()
             {
                 await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
-                
+
                 // 检查MyToolWindowCommand.Instance是否已经初始化
                 if (MyToolWindowCommand.Instance == null)
                 {
                     return;
                 }
-                
-                // 获取工具窗口（不强制显示）
-                ToolWindowPane window = await _package.ShowToolWindowAsync(typeof(SummaryToolWindow), 0, false, _package.DisposalToken);
-                if ((null == window) || (null == window.Frame))
+
+                // 改进：总是尝试获取或创建窗口，确保重启后能显示数据
+                var window = await MyToolWindowCommand.Instance.GetSummaryToolWindowAsync(
+                    createIfNeeded: true, showWindow: false, _package.DisposalToken) as SummaryToolWindow;
+
+                if (window == null || window.IsDisposed)
                 {
+                    System.Diagnostics.Debug.WriteLine("ExecuteAnalysisAsync: 无法获取有效窗口");
                     return;
                 }
 
-                // 执行代码分析
-                var diagnostics = await MyToolWindowCommand.Instance.AnalyzeSolutionAsync();
-
-                // 更新工具窗口显示
-                if (window is SummaryToolWindow summaryWindow)
-                {
-                    await summaryWindow.UpdateAnalysisResultsAsync(diagnostics);
-                }
+                window.UpdateGitStatus();
+                // 强制首次全量分析
+                MyToolWindowCommand.Instance.RequestAnalysisRefresh(immediate: true);
+                System.Diagnostics.Debug.WriteLine("ExecuteAnalysisAsync: 已触发解决方案打开后的分析");
             }
         }
 

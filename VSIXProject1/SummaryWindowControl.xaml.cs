@@ -28,7 +28,7 @@ namespace VSIXProject1
     /// <summary>
     /// SummaryWindowControl.xaml 的交互逻辑
     /// </summary>
-    public partial class SummaryWindowControl : UserControl
+    public partial class SummaryWindowControl : UserControl, IDisposable
     {
         // ViewModel 类用于 WPF 数据绑定，支持虚拟化
         public class DiagnosticItem
@@ -40,16 +40,29 @@ namespace VSIXProject1
             public Diagnostic Diagnostic { get; set; }
         }
 
-        private IVsSolution _solution;
         private AsyncPackage _package;
+        private IVsRunningDocumentTable _runningDocumentTable;
+        private RunningDocumentTableEventsHandler _runningDocumentTableEventsHandler;
+        private uint _runningDocumentTableEventsCookie;
+        private bool _isDisposed;
 
         public event EventHandler RefreshRequested;
 
         private bool _isLanguageChangedSubscribed;
         private List<Diagnostic> _latestDiagnostics = new List<Diagnostic>();
 
+        public SummaryWindowControl()
+        {
+            InitializeComponent();
+        }
+
         public void Initialize(AsyncPackage package)
         {
+            if (_isDisposed || package == null)
+            {
+                return;
+            }
+
             if (_package != package)
             {
                 _package = package;
@@ -57,6 +70,16 @@ namespace VSIXProject1
                 InitializeEventHandlers();
                 SubscribeLanguageChanged();
                 // 注册双击事件已在 XAML 中绑定到 DiagnosticsTree_MouseDoubleClick
+
+                System.Diagnostics.Debug.WriteLine("SummaryWindowControl: 初始化完成");
+            }
+            else
+            {
+                // 即使已初始化，也确保事件处理程序已注册（窗口重新打开场景）
+                if (_runningDocumentTableEventsCookie == 0)
+                {
+                    InitializeEventHandlers();
+                }
             }
         }
 
@@ -73,6 +96,11 @@ namespace VSIXProject1
 
         private void OnLanguageChanged(object sender, EventArgs e)
         {
+            if (_isDisposed)
+            {
+                return;
+            }
+
             ThreadHelper.JoinableTaskFactory.RunAsync(async () =>
             {
                 await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
@@ -99,21 +127,17 @@ namespace VSIXProject1
         {
             ThreadHelper.ThrowIfNotOnUIThread();
 
-            // 获取解决方案服务
-            _solution = _package.GetService<SVsSolution, IVsSolution>();
-            if (_solution != null)
+            if (_package == null || _runningDocumentTableEventsCookie != 0)
             {
-                // 注册解决方案事件
-                _solution.AdviseSolutionEvents(new SolutionEventsHandler(this), out _);
+                return;
             }
 
             // 获取运行文档表服务，用于监听文档变更
-            var runningDocumentTable = _package.GetService<SVsRunningDocumentTable, IVsRunningDocumentTable>();
-            if (runningDocumentTable != null)
+            _runningDocumentTable = _package.GetService<SVsRunningDocumentTable, IVsRunningDocumentTable>();
+            if (_runningDocumentTable != null)
             {
-                // 使用正确的方法注册文档变更事件
-                var rdtEvents = new RunningDocumentTableEventsHandler(this);
-                runningDocumentTable.AdviseRunningDocTableEvents(rdtEvents, out _);
+                _runningDocumentTableEventsHandler = new RunningDocumentTableEventsHandler(this);
+                _runningDocumentTable.AdviseRunningDocTableEvents(_runningDocumentTableEventsHandler, out _runningDocumentTableEventsCookie);
             }
         }
 
@@ -139,6 +163,11 @@ namespace VSIXProject1
 
             public int OnAfterSave(uint docCookie)
             {
+                if (_control._isDisposed)
+                {
+                    return VSConstants.S_OK;
+                }
+
                 // 文档保存后触发刷新（交由 MyToolWindowCommand 进行统一防抖，避免重复分析与卡顿）
                 _control.RefreshRequested?.Invoke(_control, EventArgs.Empty);
                 return VSConstants.S_OK;
@@ -274,6 +303,11 @@ namespace VSIXProject1
 
         public async Task UpdateAnalysisResultsAsync(IEnumerable<Diagnostic> diagnostics)
         {
+            if (_isDisposed)
+            {
+                return;
+            }
+
             await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
 
             Debug.WriteLine("开始更新分析结果");
@@ -366,6 +400,11 @@ namespace VSIXProject1
         /// </summary>
         public async Task ShowProgressAsync(int completedFiles, int totalFiles, string currentFile)
         {
+            if (_isDisposed)
+            {
+                return;
+            }
+
             await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
 
             if (ProgressBar.Visibility != Visibility.Visible)
@@ -378,8 +417,8 @@ namespace VSIXProject1
             ProgressBar.Maximum = totalFiles;
             ProgressBar.Value = completedFiles;
 
-            string fileName = System.IO.Path.GetFileName(currentFile);
-            if (fileName.Length > 30)
+            string fileName = currentFile != null ? System.IO.Path.GetFileName(currentFile) : string.Empty;
+            if (fileName != null && fileName.Length > 30)
             {
                 fileName = fileName.Substring(0, 27) + "...";
             }
@@ -392,6 +431,11 @@ namespace VSIXProject1
         /// </summary>
         public async Task HideProgressAsync()
         {
+            if (_isDisposed)
+            {
+                return;
+            }
+
             await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
 
             ProgressBar.Visibility = Visibility.Collapsed;
@@ -463,6 +507,10 @@ namespace VSIXProject1
         public void ClearResults()
         {
             ThreadHelper.ThrowIfNotOnUIThread();
+            if (_isDisposed)
+            {
+                return;
+            }
             DiagnosticsTree.ItemsSource = null;
         }
 
@@ -470,6 +518,11 @@ namespace VSIXProject1
         public void UpdateGitStatus(bool isGitRepository, string branch, int changedFilesCount)
         {
             ThreadHelper.ThrowIfNotOnUIThread();
+
+            if (_isDisposed)
+            {
+                return;
+            }
 
             try
             {
@@ -520,6 +573,11 @@ namespace VSIXProject1
 
         public void ShowLanguageSelectionDialog()
         {
+            if (_isDisposed)
+            {
+                return;
+            }
+
             try
             {
                 if (_package == null)
@@ -551,7 +609,10 @@ namespace VSIXProject1
                 if (_package != null)
                 {
                     var window = _package.FindToolWindow(typeof(SummaryToolWindow), 0, false);
-                    return window as SummaryToolWindow;
+                    if (window is SummaryToolWindow summaryWindow && !summaryWindow.IsDisposed)
+                    {
+                        return summaryWindow;
+                    }
                 }
                 return null;
             }
@@ -562,72 +623,42 @@ namespace VSIXProject1
             }
         }
 
-        // 解决方案事件处理程序
-        private class SolutionEventsHandler : IVsSolutionEvents
+        public void Dispose()
         {
-            private SummaryWindowControl _control;
-            private static DateTime _lastRefreshTime = DateTime.MinValue;
-            private static readonly TimeSpan REFRESH_THROTTLE_INTERVAL = TimeSpan.FromSeconds(5);
-
-            public SolutionEventsHandler(SummaryWindowControl control)
+            if (_isDisposed)
             {
-                _control = control;
+                return;
             }
 
-            private bool ShouldThrottle()
+            _isDisposed = true;
+
+            System.Diagnostics.Debug.WriteLine("SummaryWindowControl: Dispose 被调用，准备重置状态以支持重新打开");
+
+            if (_isLanguageChangedSubscribed)
             {
-                var now = DateTime.Now;
-                if (now - _lastRefreshTime < REFRESH_THROTTLE_INTERVAL)
+                LocalizationService.LanguageChanged -= OnLanguageChanged;
+                _isLanguageChangedSubscribed = false;
+            }
+
+            ThreadHelper.JoinableTaskFactory.Run(async () =>
+            {
+                await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
+
+                if (_runningDocumentTable != null && _runningDocumentTableEventsCookie != 0)
                 {
-                    return true;
+                    _runningDocumentTable.UnadviseRunningDocTableEvents(_runningDocumentTableEventsCookie);
+                    _runningDocumentTableEventsCookie = 0;
                 }
-                _lastRefreshTime = now;
-                return false;
-            }
 
-            public int OnAfterOpenProject(IVsHierarchy pHierarchy, int fAdded)
-            {
-                // 项目打开后刷新，但限制频率
-                if (!ShouldThrottle())
-                {
-                    _control.RefreshRequested?.Invoke(_control, EventArgs.Empty);
-                }
-                return VSConstants.S_OK;
-            }
+                _runningDocumentTableEventsHandler = null;
+                _runningDocumentTable = null;
+            });
 
-            public int OnQueryCloseProject(IVsHierarchy pHierarchy, int fRemoving, ref int pfCancel)
-            { return VSConstants.S_OK; }
+            _latestDiagnostics = new List<Diagnostic>();
+            _messageCache.Clear();
+            _diagnosticMap.Clear();
 
-            public int OnBeforeCloseProject(IVsHierarchy pHierarchy, int fRemoved)
-            { return VSConstants.S_OK; }
-
-            public int OnAfterLoadProject(IVsHierarchy pStubHierarchy, IVsHierarchy pRealHierarchy)
-            { return VSConstants.S_OK; }
-
-            public int OnQueryUnloadProject(IVsHierarchy pRealHierarchy, ref int pfCancel)
-            { return VSConstants.S_OK; }
-
-            public int OnBeforeUnloadProject(IVsHierarchy pRealHierarchy, IVsHierarchy pStubHierarchy)
-            { return VSConstants.S_OK; }
-
-            public int OnAfterOpenSolution(object pUnkReserved, int fNewSolution)
-            {
-                // 解决方案打开后刷新
-                if (!ShouldThrottle())
-                {
-                    _control.RefreshRequested?.Invoke(_control, EventArgs.Empty);
-                }
-                return VSConstants.S_OK;
-            }
-
-            public int OnQueryCloseSolution(object pUnkReserved, ref int pfCancel)
-            { return VSConstants.S_OK; }
-
-            public int OnBeforeCloseSolution(object pUnkReserved)
-            { return VSConstants.S_OK; }
-
-            public int OnAfterCloseSolution(object pUnkReserved)
-            { return VSConstants.S_OK; }
+            System.Diagnostics.Debug.WriteLine("SummaryWindowControl: Dispose 完成，状态已重置");
         }
     }
 }

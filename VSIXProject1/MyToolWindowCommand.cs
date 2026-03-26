@@ -120,17 +120,18 @@ namespace VSIXProject1
 
         // 分析模式
         private bool _isIncrementalAnalysis = true;
-        public bool IsIncrementalAnalysis 
+
+        public bool IsIncrementalAnalysis
         {
-            get 
-            { 
+            get
+            {
                 System.Diagnostics.Debug.WriteLine($"Get IsIncrementalAnalysis: {_isIncrementalAnalysis}");
-                return _isIncrementalAnalysis; 
+                return _isIncrementalAnalysis;
             }
-            set 
-            { 
+            set
+            {
                 System.Diagnostics.Debug.WriteLine($"Set IsIncrementalAnalysis: {value}");
-                _isIncrementalAnalysis = value; 
+                _isIncrementalAnalysis = value;
             }
         }
 
@@ -238,6 +239,52 @@ namespace VSIXProject1
             }
         }
 
+        public async Task<SummaryToolWindow> GetSummaryToolWindowAsync(bool createIfNeeded, bool showWindow, CancellationToken cancellationToken)
+        {
+            await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync(cancellationToken);
+
+            // 改进窗口查找逻辑：优先查找已存在窗口，处理已关闭但未完全Dispose的情况
+            var existingWindow = package.FindToolWindow(typeof(SummaryToolWindow), 0, false) as SummaryToolWindow;
+            if (existingWindow != null)
+            {
+                if (existingWindow.IsDisposed)
+                {
+                    System.Diagnostics.Debug.WriteLine("GetSummaryToolWindowAsync: 找到已Dispose的窗口，重新创建");
+                }
+                else
+                {
+                    if (showWindow && (existingWindow.Frame == null || existingWindow.Frame is IVsWindowFrame frame && frame.IsVisible() == 0))
+                    {
+                        System.Diagnostics.Debug.WriteLine("GetSummaryToolWindowAsync: 显示现有窗口");
+                        return await package.ShowToolWindowAsync(typeof(SummaryToolWindow), 0, true, cancellationToken) as SummaryToolWindow;
+                    }
+
+                    if (showWindow && existingWindow.Frame is IVsWindowFrame existingFrame)
+                    {
+                        ErrorHandler.ThrowOnFailure(existingFrame.Show());
+                    }
+
+                    // 确保控件已初始化
+                    existingWindow.Control?.Initialize(package);
+                    return existingWindow;
+                }
+            }
+
+            if (!createIfNeeded)
+            {
+                return null;
+            }
+
+            System.Diagnostics.Debug.WriteLine("GetSummaryToolWindowAsync: 创建新的工具窗口");
+            var createdWindow = await package.ShowToolWindowAsync(typeof(SummaryToolWindow), 0, true, cancellationToken) as SummaryToolWindow;
+            if (createdWindow != null && showWindow && createdWindow.Frame is IVsWindowFrame createdFrame)
+            {
+                ErrorHandler.ThrowOnFailure(createdFrame.Show());
+            }
+
+            return createdWindow;
+        }
+
         private void Execute(object sender, EventArgs e)
         {
             ThreadHelper.ThrowIfNotOnUIThread();
@@ -247,16 +294,18 @@ namespace VSIXProject1
                 {
                     System.Diagnostics.Debug.WriteLine("开始执行命令");
                     
-                    // 显示工具窗口，第三个参数为true表示窗口关闭后可以重新打开
+                    // 统一通过窗口解析逻辑获取实例，避免拿到已释放的旧窗口
                     System.Diagnostics.Debug.WriteLine("尝试显示工具窗口");
-                    ToolWindowPane window = await package.ShowToolWindowAsync(typeof(SummaryToolWindow), 0, true, package.DisposalToken);
+                    SummaryToolWindow window = await GetSummaryToolWindowAsync(createIfNeeded: true, showWindow: true, package.DisposalToken);
                     
                     System.Diagnostics.Debug.WriteLine($"工具窗口显示结果: {window != null}, 窗口框架: {window?.Frame != null}");
                     
-                    if ((null == window) || (null == window.Frame))
+                    if (window == null)
                     {
                         throw new NotSupportedException("无法创建工具窗口");
                     }
+
+                    window.MarkInitialRefreshRequested();
 
                     // 执行代码分析
                     System.Diagnostics.Debug.WriteLine("开始执行代码分析");
@@ -281,20 +330,17 @@ namespace VSIXProject1
                     System.Diagnostics.Debug.WriteLine($"代码分析完成，发现 {diagnostics.Count()} 个问题");
 
                     // 更新工具窗口显示
-                    if (window is SummaryToolWindow summaryWindow)
+                    if (window != null)
                     {
                         System.Diagnostics.Debug.WriteLine("更新工具窗口显示");
                         // 隐藏进度条
-                        await summaryWindow.Control.HideProgressAsync();
+                        await window.Control.HideProgressAsync();
                         // 确保控件被初始化
-                        summaryWindow.Control.Initialize(package);
-                        await summaryWindow.UpdateAnalysisResultsAsync(diagnostics);
+                        window.Control.Initialize(package);
+                        await window.UpdateAnalysisResultsAsync(diagnostics);
                         // 注意：此处不再注册刷新事件，由 SummaryToolWindow 内部触发防抖请求
                     }
 
-                    IVsWindowFrame windowFrame = (IVsWindowFrame)window.Frame;
-                    System.Diagnostics.Debug.WriteLine("显示工具窗口");
-                    Microsoft.VisualStudio.ErrorHandler.ThrowOnFailure(windowFrame.Show());
                     System.Diagnostics.Debug.WriteLine("命令执行完成");
                 }
                 catch (Exception ex)
@@ -308,8 +354,23 @@ namespace VSIXProject1
             });
         }
 
-        public void RequestAnalysisRefresh()
+        public void RequestAnalysisRefresh(bool immediate = false)
         {
+            if (immediate)
+            {
+                lock (_debounceLock)
+                {
+                    _debounceTimer?.Dispose();
+                    _debounceTimer = null;
+                }
+
+                ThreadHelper.JoinableTaskFactory.RunAsync(async () =>
+                {
+                    await QueueDebouncedRefreshAsync();
+                });
+                return;
+            }
+
             // 使用防抖机制，延迟执行分析
             lock (_debounceLock)
             {
@@ -379,24 +440,6 @@ namespace VSIXProject1
                 // 再次切回后台线程，避免阻塞 UI
                 await TaskScheduler.Default;
 
-                // 检查是否为 Git 仓库
-                bool isGitRepository = GitHelper.Instance.IsGitRepository(solutionPath);
-                Debug.WriteLine($"ExecuteRefreshWithDebounceAsync: isGitRepository={isGitRepository}");
-
-                // 如果是 Git 仓库，检查是否有更改文件
-                if (isGitRepository)
-                {
-                    var changedFiles = GitHelper.Instance.GetChangedFiles(solutionPath);
-                    Debug.WriteLine($"ExecuteRefreshWithDebounceAsync: 更改文件数={changedFiles.Count()}");
-
-                    // 如果没有更改文件，不执行分析
-                    if (!changedFiles.Any())
-                    {
-                        Debug.WriteLine("ExecuteRefreshWithDebounceAsync: 无更改文件，不执行分析");
-                        return;
-                    }
-                }
-
                 // 保存/自动刷新路径默认禁用逐文件进度UI，避免大文件保存后主线程频繁刷新导致卡顿
                 var diagnostics = await AnalyzeSolutionAsync(progress: null, cancellationToken: cancellationToken);
 
@@ -404,9 +447,8 @@ namespace VSIXProject1
                 Debug.WriteLine($"分析完成，共发现 {diagnostics.Count()} 个问题");
 
                 // 更新工具窗口显示（切换到UI线程）
-                await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync(cancellationToken);
-                var window = package.FindToolWindow(typeof(SummaryToolWindow), 0, false);
-                if (window is SummaryToolWindow summaryWindow)
+                var summaryWindow = await GetSummaryToolWindowAsync(createIfNeeded: false, showWindow: false, cancellationToken);
+                if (summaryWindow != null)
                 {
                     // 隐藏进度条
                     await summaryWindow.Control.HideProgressAsync();
@@ -458,19 +500,20 @@ namespace VSIXProject1
             bool isGitRepository = GitHelper.Instance.IsGitRepository(solutionPath);
             string gitRoot = GitHelper.Instance.GetGitRoot(solutionPath);
             bool useIncrementalAnalysis = IsIncrementalAnalysis;
-            
+
             List<string> filesToAnalyze = new List<string>();
 
-            if (isGitRepository && !string.IsNullOrEmpty(gitRoot))
+            if (isGitRepository && !string.IsNullOrEmpty(gitRoot) && _gitEventMonitor == null)
             {
-                if (_gitEventMonitor == null)
-                {
-                    StartGitEventMonitoring(solutionPath);
-                }
+                StartGitEventMonitoring(solutionPath);
+            }
 
+            if (useIncrementalAnalysis && isGitRepository && !string.IsNullOrEmpty(gitRoot))
+            {
                 // 获取更改的文件可能涉及 IO，可以切到后台
                 await TaskScheduler.Default;
                 var changedFiles = GitHelper.Instance.GetChangedFiles(solutionPath);
+                Debug.WriteLine($"AnalyzeSolutionAsync: 增量分析，更改文件数={changedFiles.Count()}");
                 if (changedFiles.Any())
                 {
                     filesToAnalyze = changedFiles.Where(f => !ShouldExcludeDirectory(f)).ToList();
@@ -584,6 +627,7 @@ namespace VSIXProject1
                 progress?.Report(new AnalysisProgress { CompletedFiles = totalFiles, TotalFiles = totalFiles, CurrentFile = "分析完成", IsCompleted = true });
 
                 var uniqueDiagnostics = diagnostics.Distinct(new DiagnosticEqualityComparer()).ToList();
+
                 return uniqueDiagnostics;
             }, cancellationToken);
         }

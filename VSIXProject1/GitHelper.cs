@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Threading;
 using System.Threading.Tasks;
 
 namespace VSIXProject1
@@ -616,8 +615,8 @@ namespace VSIXProject1
 
                         void HandleFileEvent(string eventType, string filePath)
                         {
-                            // 使用极低延迟的防抖，合并频繁的文件更改事件，提升刷新及时性
-                            gitEventDebounce.Change(100, Timeout.Infinite);
+                            // 使用简单的节流/防抖，合并频繁的文件更改事件
+                            gitEventDebounce.Change(500, Timeout.Infinite);
                         }
 
                         workDirWatcher.Changed += (s, e) => HandleFileEvent("变化", e.FullPath);

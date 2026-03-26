@@ -224,51 +224,29 @@ namespace VSIXProject1
                 if (package == null)
                     return;
 
-                // 异步获取 Git 状态，避免在后台线程调用 COM 对象
-                package.JoinableTaskFactory.RunAsync(async () =>
+                // 获取当前解决方案路径
+                var solution = package.GetService<Microsoft.VisualStudio.Shell.Interop.SVsSolution, Microsoft.VisualStudio.Shell.Interop.IVsSolution>();
+                if (solution == null)
+                    return;
+
+                string solutionPath = string.Empty;
+                solution.GetSolutionInfo(out solutionPath, out _, out _);
+
+                if (string.IsNullOrEmpty(solutionPath))
+                    return;
+
+                // 检查 Git 仓库状态
+                IsGitRepository = GitHelper.Instance.IsGitRepository(solutionPath);
+                CurrentBranch = GitHelper.Instance.GetCurrentBranch(solutionPath);
+                ChangedFilesCount = GitHelper.Instance.GetChangedFiles(solutionPath).Count();
+
+                System.Diagnostics.Debug.WriteLine($"Git 状态更新: IsGitRepository={IsGitRepository}, Branch={CurrentBranch}, ChangedFiles={ChangedFilesCount}");
+
+                // 更新控件显示
+                if (Control != null)
                 {
-                    try
-                    {
-                        await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
-
-                        // 获取当前解决方案路径 (必须在 UI 线程)
-                        var solution = package.GetService<Microsoft.VisualStudio.Shell.Interop.SVsSolution, Microsoft.VisualStudio.Shell.Interop.IVsSolution>();
-                        if (solution == null)
-                            return;
-
-                        string solutionPath = string.Empty;
-                        solution.GetSolutionInfo(out solutionPath, out _, out _);
-
-                        if (string.IsNullOrEmpty(solutionPath))
-                            return;
-
-                        // 切换到后台执行耗时的 Git 检查
-                        await TaskScheduler.Default;
-
-                        bool isGitRepo = GitHelper.Instance.IsGitRepository(solutionPath);
-                        string branch = GitHelper.Instance.GetCurrentBranch(solutionPath);
-                        int changedCount = GitHelper.Instance.GetChangedFiles(solutionPath).Count();
-
-                        // 切换回 UI 线程更新控件
-                        await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
-
-                        IsGitRepository = isGitRepo;
-                        CurrentBranch = branch;
-                        ChangedFilesCount = changedCount;
-
-                        System.Diagnostics.Debug.WriteLine($"Git 状态更新: IsGitRepository={IsGitRepository}, Branch={CurrentBranch}, ChangedFiles={ChangedFilesCount}");
-
-                        // 更新控件显示
-                        if (Control != null)
-                        {
-                            Control.UpdateGitStatus(IsGitRepository, CurrentBranch, ChangedFilesCount);
-                        }
-                    }
-                    catch (Exception ex)
-                    {
-                        System.Diagnostics.Debug.WriteLine($"UpdateGitStatus 异步执行错误: {ex.Message}");
-                    }
-                });
+                    Control.UpdateGitStatus(IsGitRepository, CurrentBranch, ChangedFilesCount);
+                }
             }
             catch (Exception ex)
             {

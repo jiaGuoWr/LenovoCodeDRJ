@@ -39,7 +39,6 @@ namespace VSIXProject1
         public class DiagnosticItem
         {
             public string DisplayText { get; set; }
-            public string FilePathGroup { get; set; }
             public Diagnostic Diagnostic { get; set; }
         }
 
@@ -282,68 +281,69 @@ namespace VSIXProject1
 
         public async Task UpdateAnalysisResultsAsync(IEnumerable<Diagnostic> diagnostics)
         {
-            Debug.WriteLine("开始更新分析结果");
-            
-            // 确保我们在后台线程处理数据转换
-            await TaskScheduler.Default;
+            await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
 
+            Debug.WriteLine("开始更新分析结果");
             _latestDiagnostics = diagnostics?.ToList() ?? new List<Diagnostic>();
 
-            if (diagnostics == null || _latestDiagnostics.Count == 0)
+            if (diagnostics == null)
             {
                 Debug.WriteLine("UpdateAnalysisResults: diagnostics 为空");
-                await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
-                DiagnosticsList.ItemsSource = null;
+                DiagnosticsTree.ItemsSource = null;
                 return;
             }
 
-            // 诊断结果已在后台线程去重，此处直接使用
-            var uniqueDiagnostics = _latestDiagnostics;
+            // 使用 DiagnosticEqualityComparer 去重 - 确保不同位置的问题都能显示
+            var uniqueDiagnostics = diagnostics.Distinct(_diagnosticComparer).ToList();
 
-            Debug.WriteLine($"UpdateAnalysisResults: 诊断数量={uniqueDiagnostics.Count}");
+            Debug.WriteLine($"UpdateAnalysisResults: 去重后诊断数量={uniqueDiagnostics.Count}");
 
-            // 异步构建 ViewModel 扁平化数据（配合 ListBox GroupStyle 能够实现极致的UI渲染）
-            var flattenedDiagnostics = uniqueDiagnostics
-                .Select(diagnostic =>
-                {
-                    string path;
-                    try
-                    {
-                        path = diagnostic.Location?.GetLineSpan().Path;
-                        if (string.IsNullOrEmpty(path)) path = GetUnknownFileText();
-                    }
-                    catch
-                    {
-                        path = GetUnknownFileText();
-                    }
-
-                    var lineSpan = diagnostic.Location.GetLineSpan();
-                    int line = lineSpan.StartLinePosition.Line + 1;
-                    string lineLabel = GetLineLabel(line);
-                    string localizedMessage = DiagnosticMessageLocalizer.GetDisplayMessage(diagnostic);
-
-                    return new DiagnosticItem
-                    {
-                        FilePathGroup = path,
-                        DisplayText = $"{lineLabel} {diagnostic.Id}: {localizedMessage}",
-                        Diagnostic = diagnostic
-                    };
-                })
-                .OrderBy(item => item.FilePathGroup)
-                .ToList();
-
-            // 切回UI线程绑定到 ListBox
-            await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
-
-            var view = (CollectionView)CollectionViewSource.GetDefaultView(flattenedDiagnostics);
-            if (view.GroupDescriptions.Count == 0)
+            if (uniqueDiagnostics.Count == 0)
             {
-                view.GroupDescriptions.Add(new PropertyGroupDescription("FilePathGroup"));
+                DiagnosticsTree.ItemsSource = null;
+                return;
             }
 
-            DiagnosticsList.ItemsSource = view;
+            // 异步构建 ViewModel 数据
+            var groupedDiagnostics = await Task.Run(() =>
+            {
+                return uniqueDiagnostics
+                    .GroupBy(d =>
+                    {
+                        try
+                        {
+                            var path = d.Location?.GetLineSpan().Path;
+                            return string.IsNullOrEmpty(path) ? GetUnknownFileText() : path;
+                        }
+                        catch
+                        {
+                            return GetUnknownFileText();
+                        }
+                    })
+                    .OrderBy(g => g.Key)
+                    .Select(g => new DiagnosticFileGroup
+                    {
+                        HeaderText = $"{g.Key} ({g.Count()})",
+                        Diagnostics = g.Select(diagnostic =>
+                        {
+                            var lineSpan = diagnostic.Location.GetLineSpan();
+                            int line = lineSpan.StartLinePosition.Line + 1;
+                            string lineLabel = GetLineLabel(line);
+                            string localizedMessage = DiagnosticMessageLocalizer.GetDisplayMessage(diagnostic);
 
-            Debug.WriteLine($"UpdateAnalysisResults: 完成更新，{flattenedDiagnostics.Count} 个问题");
+                            return new DiagnosticItem
+                            {
+                                DisplayText = $"{lineLabel} {diagnostic.Id}: {localizedMessage}",
+                                Diagnostic = diagnostic
+                            };
+                        }).ToList()
+                    }).ToList();
+            });
+
+            // 绑定到 TreeView
+            DiagnosticsTree.ItemsSource = groupedDiagnostics;
+
+            Debug.WriteLine($"UpdateAnalysisResults: 完成更新，{groupedDiagnostics.Count} 个文件分组");
         }
 
         /// <summary>
@@ -384,11 +384,11 @@ namespace VSIXProject1
             ToggleModeButton.Visibility = Visibility.Visible;
         }
 
-        private void DiagnosticsList_MouseDoubleClick(object sender, System.Windows.Input.MouseButtonEventArgs e)
+        private void DiagnosticsTree_MouseDoubleClick(object sender, System.Windows.Input.MouseButtonEventArgs e)
         {
             ThreadHelper.ThrowIfNotOnUIThread();
 
-            if (DiagnosticsList.SelectedItem is DiagnosticItem item && item.Diagnostic != null)
+            if (DiagnosticsTree.SelectedItem is DiagnosticItem item && item.Diagnostic != null)
             {
                 NavigateToErrorLocation(item.Diagnostic);
             }
@@ -448,7 +448,7 @@ namespace VSIXProject1
         public void ClearResults()
         {
             ThreadHelper.ThrowIfNotOnUIThread();
-            DiagnosticsList.ItemsSource = null;
+            DiagnosticsTree.ItemsSource = null;
         }
 
         // 更新 Git 状态显示

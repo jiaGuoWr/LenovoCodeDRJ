@@ -143,7 +143,7 @@ namespace VSIXProject1
         // 防抖定时器，用于延迟执行分析
         private System.Threading.Timer _debounceTimer;
         private readonly object _debounceLock = new object();
-        private const int DEBOUNCE_DELAY_MS = 150; // 150毫秒极速防抖延迟，提供最快的数据刷新及时性
+        private const int DEBOUNCE_DELAY_MS = 2000; // 2秒防抖延迟，避免大文件频繁保存卡顿
         private readonly SemaphoreSlim _refreshExecutionGate = new SemaphoreSlim(1, 1);
         private CancellationTokenSource _refreshAnalysisCts;
         private int _pendingRefreshRequests = 0;
@@ -328,15 +328,9 @@ namespace VSIXProject1
         {
             Interlocked.Increment(ref _pendingRefreshRequests);
 
-            // 立即取消当前正在执行的冗余分析任务，确保最新的修改能第一时间得到响应
-            lock (_debounceLock)
-            {
-                _refreshAnalysisCts?.Cancel();
-            }
-
             if (!await _refreshExecutionGate.WaitAsync(0))
             {
-                // 已有刷新任务在执行（且刚才已被我们取消），当前请求仅标记为 pending，由正在运行的循环合并处理最新状态
+                // 已有刷新任务在执行，当前请求仅标记为 pending，由正在运行的循环合并处理
                 return;
             }
 
@@ -347,6 +341,7 @@ namespace VSIXProject1
                     CancellationTokenSource currentCts = null;
                     lock (_debounceLock)
                     {
+                        _refreshAnalysisCts?.Cancel();
                         _refreshAnalysisCts?.Dispose();
                         _refreshAnalysisCts = CancellationTokenSource.CreateLinkedTokenSource(package.DisposalToken);
                         currentCts = _refreshAnalysisCts;
@@ -367,8 +362,41 @@ namespace VSIXProject1
             {
                 cancellationToken.ThrowIfCancellationRequested();
 
-                // 统一交由 AnalyzeSolutionAsync 内部去判断是否有修改文件等操作，避免在这层重复调用耗时的 Git 命令
-                
+                // 获取当前打开的解决方案
+                await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync(cancellationToken);
+                IVsSolution solution = package.GetService<SVsSolution, IVsSolution>();
+                if (solution == null)
+                {
+                    Debug.WriteLine("ExecuteRefreshWithDebounceAsync: solution 为空");
+                    return;
+                }
+
+                // 获取解决方案路径
+                string solutionPath = string.Empty;
+                solution.GetSolutionInfo(out solutionPath, out _, out _);
+                Debug.WriteLine($"ExecuteRefreshWithDebounceAsync: solutionPath={solutionPath}");
+
+                // 再次切回后台线程，避免阻塞 UI
+                await TaskScheduler.Default;
+
+                // 检查是否为 Git 仓库
+                bool isGitRepository = GitHelper.Instance.IsGitRepository(solutionPath);
+                Debug.WriteLine($"ExecuteRefreshWithDebounceAsync: isGitRepository={isGitRepository}");
+
+                // 如果是 Git 仓库，检查是否有更改文件
+                if (isGitRepository)
+                {
+                    var changedFiles = GitHelper.Instance.GetChangedFiles(solutionPath);
+                    Debug.WriteLine($"ExecuteRefreshWithDebounceAsync: 更改文件数={changedFiles.Count()}");
+
+                    // 如果没有更改文件，不执行分析
+                    if (!changedFiles.Any())
+                    {
+                        Debug.WriteLine("ExecuteRefreshWithDebounceAsync: 无更改文件，不执行分析");
+                        return;
+                    }
+                }
+
                 // 保存/自动刷新路径默认禁用逐文件进度UI，避免大文件保存后主线程频繁刷新导致卡顿
                 var diagnostics = await AnalyzeSolutionAsync(progress: null, cancellationToken: cancellationToken);
 
@@ -426,10 +454,7 @@ namespace VSIXProject1
             solution.GetSolutionInfo(out solutionPath, out _, out _);
             System.Diagnostics.Debug.WriteLine($"AnalyzeSolutionAsync: solutionPath={solutionPath}");
 
-            // 切换到后台线程，避免所有磁盘和 Git 操作阻塞 UI 线程
-            await TaskScheduler.Default;
-
-            // 检查 Git 根目录等信息（涉及磁盘 IO，必须在后台执行）
+            // 检查 Git 根目录等信息，不需要是COM调用但在此处执行很快
             bool isGitRepository = GitHelper.Instance.IsGitRepository(solutionPath);
             string gitRoot = GitHelper.Instance.GetGitRoot(solutionPath);
             bool useIncrementalAnalysis = IsIncrementalAnalysis;
@@ -443,6 +468,8 @@ namespace VSIXProject1
                     StartGitEventMonitoring(solutionPath);
                 }
 
+                // 获取更改的文件可能涉及 IO，可以切到后台
+                await TaskScheduler.Default;
                 var changedFiles = GitHelper.Instance.GetChangedFiles(solutionPath);
                 if (changedFiles.Any())
                 {
@@ -455,8 +482,7 @@ namespace VSIXProject1
             }
             else
             {
-                // 全量分析模式：切回UI线程遍历 COM 项目层次结构
-                await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync(cancellationToken);
+                // 全量分析模式：必须在UI线程上遍历 COM 项目层次结构
                 System.Diagnostics.Debug.WriteLine("使用全量分析模式");
                 IEnumHierarchies enumHierarchies;
                 Guid guid = Guid.Empty;
@@ -485,9 +511,6 @@ namespace VSIXProject1
                 
                 // 去重
                 filesToAnalyze = filesToAnalyze.Distinct().ToList();
-
-                // 再次切回后台线程执行分析
-                await TaskScheduler.Default;
             }
 
             // 现在我们有了一个纯字符串列表，安全切换到真正的后台线程执行繁重的分析任务

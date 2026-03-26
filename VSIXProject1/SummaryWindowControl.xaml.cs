@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -36,10 +37,47 @@ namespace VSIXProject1
             public List<DiagnosticItem> Diagnostics { get; set; } = new List<DiagnosticItem>();
         }
 
-        public class DiagnosticItem
+        public class DiagnosticItem : IEquatable<DiagnosticItem>
         {
             public string DisplayText { get; set; }
+            public string FilePathGroup { get; set; }
+            public string IndentMargin { get; set; } = "16,0,0,0";
+            public string TextWeight { get; set; } = "Normal";
             public Diagnostic Diagnostic { get; set; }
+
+            public bool Equals(DiagnosticItem other)
+            {
+                if (other == null) return false;
+                if (ReferenceEquals(this, other)) return true;
+                
+                // Header rows don't have a Diagnostic but have a FilePathGroup
+                if (Diagnostic == null && other.Diagnostic == null)
+                    return DisplayText == other.DisplayText;
+                
+                if (Diagnostic == null || other.Diagnostic == null)
+                    return false;
+                
+                return Diagnostic.Id == other.Diagnostic.Id && 
+                       DisplayText == other.DisplayText &&
+                       Diagnostic.Location.GetLineSpan().Path == other.Diagnostic.Location.GetLineSpan().Path &&
+                       Diagnostic.Location.GetLineSpan().StartLinePosition.Line == other.Diagnostic.Location.GetLineSpan().StartLinePosition.Line;
+            }
+
+            public override int GetHashCode()
+            {
+                unchecked
+                {
+                    int hash = 17;
+                    hash = hash * 23 + (DisplayText?.GetHashCode() ?? 0);
+                    if (Diagnostic != null)
+                    {
+                        hash = hash * 23 + (Diagnostic.Id?.GetHashCode() ?? 0);
+                        hash = hash * 23 + (Diagnostic.Location.GetLineSpan().Path?.GetHashCode() ?? 0);
+                        hash = hash * 23 + Diagnostic.Location.GetLineSpan().StartLinePosition.Line.GetHashCode();
+                    }
+                    return hash;
+                }
+            }
         }
 
         private IVsSolution _solution;
@@ -50,9 +88,13 @@ namespace VSIXProject1
         private bool _isLanguageChangedSubscribed;
         private List<Diagnostic> _latestDiagnostics = new List<Diagnostic>();
 
+        // 使用 ObservableCollection 维护界面数据，实现差异化更新以避免卡顿
+        private ObservableCollection<DiagnosticItem> _uiDiagnostics = new ObservableCollection<DiagnosticItem>();
+
         public SummaryWindowControl()
         {
             InitializeComponent();
+            DiagnosticsTree.ItemsSource = _uiDiagnostics;
         }
 
         public void Initialize(AsyncPackage package)
@@ -304,46 +346,129 @@ namespace VSIXProject1
                 return;
             }
 
-            // 异步构建 ViewModel 数据
-            var groupedDiagnostics = await Task.Run(() =>
+            // 异步构建完全扁平化的列表以实现极致的UI虚拟化
+            // （不再使用WPF内置的 Grouping 功能，因为那会破坏 ListBox 的虚拟化）
+            var flattenedData = await Task.Run(() =>
             {
-                return uniqueDiagnostics
-                    .GroupBy(d =>
+                var list = new List<DiagnosticItem>();
+                
+                var grouped = uniqueDiagnostics.GroupBy(d =>
+                {
+                    try
                     {
-                        try
-                        {
-                            var path = d.Location?.GetLineSpan().Path;
-                            return string.IsNullOrEmpty(path) ? GetUnknownFileText() : path;
-                        }
-                        catch
-                        {
-                            return GetUnknownFileText();
-                        }
-                    })
-                    .OrderBy(g => g.Key)
-                    .Select(g => new DiagnosticFileGroup
+                        var path = d.Location?.GetLineSpan().Path;
+                        return string.IsNullOrEmpty(path) ? GetUnknownFileText() : path;
+                    }
+                    catch
                     {
-                        HeaderText = $"{g.Key} ({g.Count()})",
-                        Diagnostics = g.Select(diagnostic =>
-                        {
-                            var lineSpan = diagnostic.Location.GetLineSpan();
-                            int line = lineSpan.StartLinePosition.Line + 1;
-                            string lineLabel = GetLineLabel(line);
-                            string localizedMessage = DiagnosticMessageLocalizer.GetDisplayMessage(diagnostic);
+                        return GetUnknownFileText();
+                    }
+                }).OrderBy(g => g.Key);
 
-                            return new DiagnosticItem
-                            {
-                                DisplayText = $"{lineLabel} {diagnostic.Id}: {localizedMessage}",
-                                Diagnostic = diagnostic
-                            };
-                        }).ToList()
-                    }).ToList();
+                foreach (var group in grouped)
+                {
+                    // 插入文件头（伪装为树的父节点）
+                    list.Add(new DiagnosticItem
+                    {
+                        DisplayText = $"{group.Key} ({group.Count()})",
+                        IndentMargin = "2,4,2,2",
+                        TextWeight = "Bold",
+                        Diagnostic = null // 头部不可跳转
+                    });
+
+                    // 插入诊断明细（伪装为树的子节点，通过 Margin 缩进）
+                    foreach (var diagnostic in group)
+                    {
+                        var lineSpan = diagnostic.Location.GetLineSpan();
+                        int line = lineSpan.StartLinePosition.Line + 1;
+                        string lineLabel = GetLineLabel(line);
+                        string localizedMessage = DiagnosticMessageLocalizer.GetDisplayMessage(diagnostic);
+
+                        list.Add(new DiagnosticItem
+                        {
+                            DisplayText = $"{lineLabel} {diagnostic.Id}: {localizedMessage}",
+                            IndentMargin = "16,0,0,0",
+                            TextWeight = "Normal",
+                            Diagnostic = diagnostic
+                        });
+                    }
+                }
+                
+                return list;
             });
 
-            // 绑定到 TreeView
-            DiagnosticsTree.ItemsSource = groupedDiagnostics;
+            // 切回UI线程增量更新 ObservableCollection 以避免破坏 UI 虚拟化并防止重绘卡顿
+            await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
 
-            Debug.WriteLine($"UpdateAnalysisResults: 完成更新，{groupedDiagnostics.Count} 个文件分组");
+            // 差异化更新 UI (Incremental Diffing Update)
+            int oldIndex = 0;
+            int newIndex = 0;
+
+            while (oldIndex < _uiDiagnostics.Count || newIndex < flattenedData.Count)
+            {
+                // 如果旧列表已经遍历完，直接把新列表剩下的元素加到尾部
+                if (oldIndex >= _uiDiagnostics.Count)
+                {
+                    _uiDiagnostics.Add(flattenedData[newIndex]);
+                    newIndex++;
+                }
+                // 如果新列表已经遍历完，直接把旧列表剩下的元素删掉
+                else if (newIndex >= flattenedData.Count)
+                {
+                    _uiDiagnostics.RemoveAt(_uiDiagnostics.Count - 1);
+                }
+                else
+                {
+                    var oldItem = _uiDiagnostics[oldIndex];
+                    var newItem = flattenedData[newIndex];
+
+                    if (oldItem.Equals(newItem))
+                    {
+                        // 元素相同，都向前推进
+                        oldIndex++;
+                        newIndex++;
+                    }
+                    else
+                    {
+                        // 元素不同。为了简化复杂的 Diff 算法且保证性能，
+                        // 当遇到不同时，尝试判断是新增还是删除（向前探查1步）
+                        bool isInsert = false;
+                        bool isDelete = false;
+
+                        // 探查是否为新增（新列表下一个等于旧列表当前）
+                        if (newIndex + 1 < flattenedData.Count && _uiDiagnostics[oldIndex].Equals(flattenedData[newIndex + 1]))
+                        {
+                            isInsert = true;
+                        }
+                        // 探查是否为删除（旧列表下一个等于新列表当前）
+                        else if (oldIndex + 1 < _uiDiagnostics.Count && _uiDiagnostics[oldIndex + 1].Equals(flattenedData[newIndex]))
+                        {
+                            isDelete = true;
+                        }
+
+                        if (isInsert)
+                        {
+                            _uiDiagnostics.Insert(oldIndex, newItem);
+                            oldIndex++; // 因为插入了一个元素，旧列表的索引也要跟着右移
+                            newIndex++;
+                        }
+                        else if (isDelete)
+                        {
+                            _uiDiagnostics.RemoveAt(oldIndex);
+                            // 不改变索引，下一次循环继续用当前的 oldIndex 比较新的元素
+                        }
+                        else
+                        {
+                            // 既不是单纯的新增也不是单纯的删除，直接替换
+                            _uiDiagnostics[oldIndex] = newItem;
+                            oldIndex++;
+                            newIndex++;
+                        }
+                    }
+                }
+            }
+
+            Debug.WriteLine($"UpdateAnalysisResults: 完成差异化更新，目前共 {_uiDiagnostics.Count} 个 UI 节点");
         }
 
         /// <summary>
@@ -448,7 +573,7 @@ namespace VSIXProject1
         public void ClearResults()
         {
             ThreadHelper.ThrowIfNotOnUIThread();
-            DiagnosticsTree.ItemsSource = null;
+            _uiDiagnostics.Clear();
         }
 
         // 更新 Git 状态显示

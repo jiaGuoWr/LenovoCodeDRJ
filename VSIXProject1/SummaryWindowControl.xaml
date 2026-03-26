@@ -47,31 +47,30 @@
         
         <!-- 内容区域 -->
         <Grid Margin="0,22,0,0">
-            <!-- 问题列表（按文件分组） -->
-            <TreeView x:Name="DiagnosticsTree" Margin="0,0,0,0"
-                      Background="{DynamicResource {x:Static vs:EnvironmentColors.ToolWindowBackgroundBrushKey}}"
-                      BorderThickness="0"
-                      MouseDoubleClick="DiagnosticsTree_MouseDoubleClick"
-                      VirtualizingPanel.IsVirtualizing="True"
-                      VirtualizingPanel.VirtualizationMode="Recycling"
-                      ScrollViewer.CanContentScroll="True">
-                <TreeView.ItemTemplate>
-                    <HierarchicalDataTemplate ItemsSource="{Binding Diagnostics}">
-                        <TextBlock Text="{Binding HeaderText}" FontWeight="Bold" Foreground="{DynamicResource {x:Static vs:EnvironmentColors.ToolWindowTextBrushKey}}"/>
-                        <HierarchicalDataTemplate.ItemTemplate>
-                            <DataTemplate>
-                                <TextBlock Text="{Binding DisplayText}" Foreground="{DynamicResource {x:Static vs:EnvironmentColors.ToolWindowTextBrushKey}}"/>
-                            </DataTemplate>
-                        </HierarchicalDataTemplate.ItemTemplate>
-                    </HierarchicalDataTemplate>
-                </TreeView.ItemTemplate>
-                <TreeView.ItemsPanel>
+            <!-- 问题列表（使用扁平化 ListBox 实现真正的纯平极速虚拟化，大幅缩短 UI 渲染停顿） -->
+            <ListBox x:Name="DiagnosticsTree" Margin="0,0,0,0"
+                     Background="{DynamicResource {x:Static vs:EnvironmentColors.ToolWindowBackgroundBrushKey}}"
+                     BorderThickness="0"
+                     MouseDoubleClick="DiagnosticsTree_MouseDoubleClick"
+                     VirtualizingPanel.IsVirtualizing="True"
+                     VirtualizingPanel.VirtualizationMode="Recycling"
+                     ScrollViewer.CanContentScroll="True">
+                <ListBox.ItemTemplate>
+                    <DataTemplate>
+                        <!-- 使用 Margin 伪造树状缩进。当 IsHeader 为 True 时靠左加粗显示文件名，否则缩进显示具体错误 -->
+                        <TextBlock Text="{Binding DisplayText}" 
+                                   Margin="{Binding IndentMargin}"
+                                   FontWeight="{Binding TextWeight}"
+                                   Foreground="{DynamicResource {x:Static vs:EnvironmentColors.ToolWindowTextBrushKey}}"/>
+                    </DataTemplate>
+                </ListBox.ItemTemplate>
+                <ListBox.ItemsPanel>
                     <ItemsPanelTemplate>
                         <VirtualizingStackPanel IsVirtualizing="True"
                                                 VirtualizationMode="Recycling"/>
                     </ItemsPanelTemplate>
-                </TreeView.ItemsPanel>
-                <TreeView.Resources>
+                </ListBox.ItemsPanel>
+                <ListBox.Resources>
                     <SolidColorBrush x:Key="{x:Static SystemColors.HighlightBrushKey}"
                                      Color="{DynamicResource {x:Static vs:TreeViewColors.SelectedItemActiveColorKey}}"/>
                     <SolidColorBrush x:Key="{x:Static SystemColors.HighlightTextBrushKey}"
@@ -80,15 +79,11 @@
                                      Color="{DynamicResource {x:Static vs:TreeViewColors.SelectedItemInactiveColorKey}}"/>
                     <SolidColorBrush x:Key="{x:Static SystemColors.InactiveSelectionHighlightTextBrushKey}"
                                      Color="{DynamicResource {x:Static vs:TreeViewColors.SelectedItemInactiveTextColorKey}}"/>
-                    <SolidColorBrush x:Key="{x:Static SystemColors.ControlBrushKey}"
-                                     Color="{DynamicResource {x:Static vs:TreeViewColors.SelectedItemActiveColorKey}}"/>
-                    <SolidColorBrush x:Key="{x:Static SystemColors.ControlTextBrushKey}"
-                                     Color="{DynamicResource {x:Static vs:TreeViewColors.SelectedItemActiveTextColorKey}}"/>
-                    <Style TargetType="TreeViewItem">
+                    <Style TargetType="ListBoxItem">
                         <Setter Property="Foreground" Value="{DynamicResource {x:Static vs:EnvironmentColors.ToolWindowTextBrushKey}}"/>
-                        <Setter Property="IsExpanded" Value="True"/>
                         <Setter Property="Padding" Value="2,2,2,2"/>
                         <Setter Property="Background" Value="Transparent"/>
+                        <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
                         <Style.Triggers>
                             <Trigger Property="IsSelected" Value="True">
                                 <Setter Property="Background" Value="{DynamicResource {x:Static SystemColors.HighlightBrushKey}}"/>
@@ -96,8 +91,8 @@
                             </Trigger>
                         </Style.Triggers>
                     </Style>
-                </TreeView.Resources>
-            </TreeView>
+                </ListBox.Resources>
+            </ListBox>
         </Grid>
     </Grid>
 </UserControl>

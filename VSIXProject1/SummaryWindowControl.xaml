@@ -47,48 +47,40 @@
         
         <!-- 内容区域 -->
         <Grid Margin="0,22,0,0">
-            <!-- 问题列表（按文件分组） -->
-            <TreeView x:Name="DiagnosticsTree" Margin="0,0,0,0"
-                      Background="{DynamicResource {x:Static vs:EnvironmentColors.ToolWindowBackgroundBrushKey}}"
-                      BorderThickness="0"
-                      MouseDoubleClick="DiagnosticsTree_MouseDoubleClick"
-                      VirtualizingPanel.IsVirtualizing="True"
-                      VirtualizingPanel.VirtualizationMode="Recycling"
-                      ScrollViewer.CanContentScroll="True">
-                <TreeView.ItemTemplate>
-                    <HierarchicalDataTemplate ItemsSource="{Binding Diagnostics}">
-                        <TextBlock Text="{Binding HeaderText}" FontWeight="Bold" Foreground="{DynamicResource {x:Static vs:EnvironmentColors.ToolWindowTextBrushKey}}"/>
-                        <HierarchicalDataTemplate.ItemTemplate>
+            <!-- 问题列表（按文件分组，使用扁平 ListBox 配合分组极大提升虚拟化性能） -->
+            <ListBox x:Name="DiagnosticsList" Margin="0,0,0,0"
+                     Background="{DynamicResource {x:Static vs:EnvironmentColors.ToolWindowBackgroundBrushKey}}"
+                     BorderThickness="0"
+                     MouseDoubleClick="DiagnosticsList_MouseDoubleClick"
+                     VirtualizingPanel.IsVirtualizing="True"
+                     VirtualizingPanel.VirtualizationMode="Recycling"
+                     ScrollViewer.CanContentScroll="True">
+                <ListBox.GroupStyle>
+                    <GroupStyle>
+                        <GroupStyle.HeaderTemplate>
                             <DataTemplate>
-                                <TextBlock Text="{Binding DisplayText}" Foreground="{DynamicResource {x:Static vs:EnvironmentColors.ToolWindowTextBrushKey}}"/>
+                                <TextBlock Text="{Binding Name}" FontWeight="Bold" Margin="2,4,2,2"
+                                           Foreground="{DynamicResource {x:Static vs:EnvironmentColors.ToolWindowTextBrushKey}}"/>
                             </DataTemplate>
-                        </HierarchicalDataTemplate.ItemTemplate>
-                    </HierarchicalDataTemplate>
-                </TreeView.ItemTemplate>
-                <TreeView.ItemsPanel>
+                        </GroupStyle.HeaderTemplate>
+                    </GroupStyle>
+                </ListBox.GroupStyle>
+                <ListBox.ItemTemplate>
+                    <DataTemplate>
+                        <TextBlock Text="{Binding DisplayText}" Margin="16,0,0,0"
+                                   Foreground="{DynamicResource {x:Static vs:EnvironmentColors.ToolWindowTextBrushKey}}"/>
+                    </DataTemplate>
+                </ListBox.ItemTemplate>
+                <ListBox.ItemsPanel>
                     <ItemsPanelTemplate>
-                        <VirtualizingStackPanel IsVirtualizing="True"
-                                                VirtualizationMode="Recycling"/>
+                        <VirtualizingStackPanel IsVirtualizing="True" VirtualizationMode="Recycling" />
                     </ItemsPanelTemplate>
-                </TreeView.ItemsPanel>
-                <TreeView.Resources>
-                    <SolidColorBrush x:Key="{x:Static SystemColors.HighlightBrushKey}"
-                                     Color="{DynamicResource {x:Static vs:TreeViewColors.SelectedItemActiveColorKey}}"/>
-                    <SolidColorBrush x:Key="{x:Static SystemColors.HighlightTextBrushKey}"
-                                     Color="{DynamicResource {x:Static vs:TreeViewColors.SelectedItemActiveTextColorKey}}"/>
-                    <SolidColorBrush x:Key="{x:Static SystemColors.InactiveSelectionHighlightBrushKey}"
-                                     Color="{DynamicResource {x:Static vs:TreeViewColors.SelectedItemInactiveColorKey}}"/>
-                    <SolidColorBrush x:Key="{x:Static SystemColors.InactiveSelectionHighlightTextBrushKey}"
-                                     Color="{DynamicResource {x:Static vs:TreeViewColors.SelectedItemInactiveTextColorKey}}"/>
-                    <SolidColorBrush x:Key="{x:Static SystemColors.ControlBrushKey}"
-                                     Color="{DynamicResource {x:Static vs:TreeViewColors.SelectedItemActiveColorKey}}"/>
-                    <SolidColorBrush x:Key="{x:Static SystemColors.ControlTextBrushKey}"
-                                     Color="{DynamicResource {x:Static vs:TreeViewColors.SelectedItemActiveTextColorKey}}"/>
-                    <Style TargetType="TreeViewItem">
-                        <Setter Property="Foreground" Value="{DynamicResource {x:Static vs:EnvironmentColors.ToolWindowTextBrushKey}}"/>
-                        <Setter Property="IsExpanded" Value="True"/>
+                </ListBox.ItemsPanel>
+                <ListBox.ItemContainerStyle>
+                    <Style TargetType="ListBoxItem">
                         <Setter Property="Padding" Value="2,2,2,2"/>
                         <Setter Property="Background" Value="Transparent"/>
+                        <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
                         <Style.Triggers>
                             <Trigger Property="IsSelected" Value="True">
                                 <Setter Property="Background" Value="{DynamicResource {x:Static SystemColors.HighlightBrushKey}}"/>
@@ -96,8 +88,8 @@
                             </Trigger>
                         </Style.Triggers>
                     </Style>
-                </TreeView.Resources>
-            </TreeView>
+                </ListBox.ItemContainerStyle>
+            </ListBox>
         </Grid>
     </Grid>
 </UserControl>

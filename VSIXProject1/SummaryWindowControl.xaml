@@ -48,12 +48,15 @@
         <!-- 内容区域 -->
         <Grid Margin="0,22,0,0">
             <!-- 问题列表（使用扁平化 ListBox 实现真正的纯平极速虚拟化，大幅缩短 UI 渲染停顿） -->
+            <!-- 绑定到 ObservableCollection，结合 VirtualizingStackPanel 实现零延迟渲染 -->
             <ListBox x:Name="DiagnosticsTree" Margin="0,0,0,0"
                      Background="{DynamicResource {x:Static vs:EnvironmentColors.ToolWindowBackgroundBrushKey}}"
                      BorderThickness="0"
                      MouseDoubleClick="DiagnosticsTree_MouseDoubleClick"
+                     ScrollViewer.HorizontalScrollBarVisibility="Disabled"
                      VirtualizingPanel.IsVirtualizing="True"
                      VirtualizingPanel.VirtualizationMode="Recycling"
+                     VirtualizingPanel.ScrollUnit="Pixel"
                      ScrollViewer.CanContentScroll="True">
                 <ListBox.ItemTemplate>
                     <DataTemplate>

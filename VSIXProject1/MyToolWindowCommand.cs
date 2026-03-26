@@ -669,7 +669,7 @@ namespace VSIXProject1
                         linkedToken.ThrowIfCancellationRequested();
 
                         // 同步读取文件
-                        string code = File.ReadAllText(filePath);
+                        string code = await Task.Run(() => File.ReadAllText(filePath), linkedToken);
                         if (string.IsNullOrWhiteSpace(code))
                         {
                             return diagnostics;
@@ -780,13 +780,6 @@ namespace VSIXProject1
             }
         }
 
-        /// <summary>
-        /// 异步分析文件 - 供外部调用
-        /// </summary>
-        private async Task<IEnumerable<Diagnostic>> AnalyzeFileAsync(string filePath, CancellationToken cancellationToken = default)
-        {
-            return await Task.Run(() => AnalyzeFile(filePath, cancellationToken), cancellationToken);
-        }
 
         /// <summary>
         /// 清理过期缓存条目 - 使用 ConcurrentDictionary 无需额外锁

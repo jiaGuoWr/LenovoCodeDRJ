@@ -353,9 +353,12 @@ namespace VSIXProject1
             // 切回UI线程直接绑定数据
             await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
 
+            var watch = System.Diagnostics.Stopwatch.StartNew();
+
             DiagnosticsTree.ItemsSource = flattenedData;
 
-            Debug.WriteLine($"UpdateAnalysisResults: 完成扁平化 UI 数据绑定，目前共 {flattenedData.Count} 个 UI 节点");
+            watch.Stop();
+            Debug.WriteLine($"UpdateAnalysisResults: 完成扁平化 UI 数据绑定，目前共 {flattenedData.Count} 个 UI 节点, 耗时: {watch.ElapsedMilliseconds}ms");
         }
 
         /// <summary>

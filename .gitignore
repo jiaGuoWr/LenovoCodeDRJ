@@ -38,3 +38,4 @@ Thumbs.db
 /LenovoAnalyzer.Tests/Infrastructure/*.cs
 /LenovoAnalyzer.Tests/*.csproj
 /LenovoAnalyzer.Tests/Rules/*.cs
+/README.md

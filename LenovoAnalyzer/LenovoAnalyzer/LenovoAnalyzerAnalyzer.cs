@@ -17,210 +17,54 @@ using Microsoft.CodeAnalysis.Text;
 [DiagnosticAnalyzer(LanguageNames.CSharp)]
 public class LenovoQiraCodeAnalyzerAnalyzer : DiagnosticAnalyzer
 {
-        public const string DiagnosticId = "CHN001";
-    private static readonly LocalizableString CHN001_Title = new LocalizableResourceString("CHN001_Title", LenovoAnalyzer.Resources.ResourceManager, typeof(LenovoAnalyzer.Resources));
-    private static readonly LocalizableString CHN001_MessageFormat = new LocalizableResourceString("CHN001_MessageFormat", LenovoAnalyzer.Resources.ResourceManager, typeof(LenovoAnalyzer.Resources));
-    private static readonly LocalizableString CHN001_Description = new LocalizableResourceString("CHN001_Description", LenovoAnalyzer.Resources.ResourceManager, typeof(LenovoAnalyzer.Resources));
+            public const string DiagnosticId = "CHN001";
     private static readonly DiagnosticDescriptor Rule = new DiagnosticDescriptor(
-        DiagnosticId,
-        CHN001_Title,
-        CHN001_MessageFormat,
-        "CodeStyle",
-        DiagnosticSeverity.Warning,
-        isEnabledByDefault: true,
-        description: CHN001_Description);
-
-        public const string MissingDllImportSearchPathsId = "DLL002";
-    private static readonly LocalizableString DLL002_Title = new LocalizableResourceString("DLL002_Title", LenovoAnalyzer.Resources.ResourceManager, typeof(LenovoAnalyzer.Resources));
-    private static readonly LocalizableString DLL002_MessageFormat = new LocalizableResourceString("DLL002_MessageFormat", LenovoAnalyzer.Resources.ResourceManager, typeof(LenovoAnalyzer.Resources));
-    private static readonly LocalizableString DLL002_Description = new LocalizableResourceString("DLL002_Description", LenovoAnalyzer.Resources.ResourceManager, typeof(LenovoAnalyzer.Resources));
+        DiagnosticId, "CHN001", "CHN001", "CodeStyle", DiagnosticSeverity.Warning, isEnabledByDefault: true);
+    public const string DLL002Id = "DLL002";
     private static readonly DiagnosticDescriptor MissingDllImportSearchPathsRule = new DiagnosticDescriptor(
-        MissingDllImportSearchPathsId,
-        DLL002_Title,
-        DLL002_MessageFormat,
-        "CodeStyle",
-        DiagnosticSeverity.Warning,
-        isEnabledByDefault: true,
-        description: DLL002_Description);
-
-        public const string InvalidStackTraceUsageId = "EXC001";
-    private static readonly LocalizableString EXC001_Title = new LocalizableResourceString("EXC001_Title", LenovoAnalyzer.Resources.ResourceManager, typeof(LenovoAnalyzer.Resources));
-    private static readonly LocalizableString EXC001_MessageFormat = new LocalizableResourceString("EXC001_MessageFormat", LenovoAnalyzer.Resources.ResourceManager, typeof(LenovoAnalyzer.Resources));
-    private static readonly LocalizableString EXC001_Description = new LocalizableResourceString("EXC001_Description", LenovoAnalyzer.Resources.ResourceManager, typeof(LenovoAnalyzer.Resources));
+        DLL002Id, "DLL002", "DLL002", "CodeStyle", DiagnosticSeverity.Warning, isEnabledByDefault: true);
+    public const string EXC001Id = "EXC001";
     private static readonly DiagnosticDescriptor InvalidStackTraceUsageRule = new DiagnosticDescriptor(
-        InvalidStackTraceUsageId,
-        EXC001_Title,
-        EXC001_MessageFormat,
-        "Security",
-        DiagnosticSeverity.Warning,
-        isEnabledByDefault: true,
-        description: EXC001_Description);
-        public const string UnsafeDllSignatureId = "DLL003";
-    private static readonly LocalizableString DLL003_Title = new LocalizableResourceString("DLL003_Title", LenovoAnalyzer.Resources.ResourceManager, typeof(LenovoAnalyzer.Resources));
-    private static readonly LocalizableString DLL003_MessageFormat = new LocalizableResourceString("DLL003_MessageFormat", LenovoAnalyzer.Resources.ResourceManager, typeof(LenovoAnalyzer.Resources));
-    private static readonly LocalizableString DLL003_Description = new LocalizableResourceString("DLL003_Description", LenovoAnalyzer.Resources.ResourceManager, typeof(LenovoAnalyzer.Resources));
+        EXC001Id, "EXC001", "EXC001", "Security", DiagnosticSeverity.Warning, isEnabledByDefault: true);
+    public const string DLL003Id = "DLL003";
     private static readonly DiagnosticDescriptor UnsafeDllSignatureRule = new DiagnosticDescriptor(
-        UnsafeDllSignatureId,
-        DLL003_Title,
-        DLL003_MessageFormat,
-        "Security",
-        DiagnosticSeverity.Warning,
-        isEnabledByDefault: true,
-        description: DLL003_Description);
-        public const string InvalidCommentedCodeId = "CODE001";
-    private static readonly LocalizableString CODE001_Title = new LocalizableResourceString("CODE001_Title", LenovoAnalyzer.Resources.ResourceManager, typeof(LenovoAnalyzer.Resources));
-    private static readonly LocalizableString CODE001_MessageFormat = new LocalizableResourceString("CODE001_MessageFormat", LenovoAnalyzer.Resources.ResourceManager, typeof(LenovoAnalyzer.Resources));
-    private static readonly LocalizableString CODE001_Description = new LocalizableResourceString("CODE001_Description", LenovoAnalyzer.Resources.ResourceManager, typeof(LenovoAnalyzer.Resources));
+        DLL003Id, "DLL003", "DLL003", "Security", DiagnosticSeverity.Warning, isEnabledByDefault: true);
+    public const string CODE001Id = "CODE001";
     private static readonly DiagnosticDescriptor InvalidCommentedCodeRule = new DiagnosticDescriptor(
-        InvalidCommentedCodeId,
-        CODE001_Title,
-        CODE001_MessageFormat,
-        "CodeStyle",
-        DiagnosticSeverity.Warning,
-        isEnabledByDefault: true,
-        description: CODE001_Description);
-        public const string SensitiveInfoInCodeId = "SEC001";
-    private static readonly LocalizableString SEC001_Title = new LocalizableResourceString("SEC001_Title", LenovoAnalyzer.Resources.ResourceManager, typeof(LenovoAnalyzer.Resources));
-    private static readonly LocalizableString SEC001_MessageFormat = new LocalizableResourceString("SEC001_MessageFormat", LenovoAnalyzer.Resources.ResourceManager, typeof(LenovoAnalyzer.Resources));
-    private static readonly LocalizableString SEC001_Description = new LocalizableResourceString("SEC001_Description", LenovoAnalyzer.Resources.ResourceManager, typeof(LenovoAnalyzer.Resources));
+        CODE001Id, "CODE001", "CODE001", "CodeStyle", DiagnosticSeverity.Warning, isEnabledByDefault: true);
+    public const string SEC001Id = "SEC001";
     private static readonly DiagnosticDescriptor SensitiveInfoInCodeRule = new DiagnosticDescriptor(
-        SensitiveInfoInCodeId,
-        SEC001_Title,
-        SEC001_MessageFormat,
-        "Security",
-        DiagnosticSeverity.Warning,
-        isEnabledByDefault: true,
-        description: SEC001_Description);
-
-        public const string PathTraversalId = "SEC002";
-    private static readonly LocalizableString SEC002_Title = new LocalizableResourceString("SEC002_Title", LenovoAnalyzer.Resources.ResourceManager, typeof(LenovoAnalyzer.Resources));
-    private static readonly LocalizableString SEC002_MessageFormat = new LocalizableResourceString("SEC002_MessageFormat", LenovoAnalyzer.Resources.ResourceManager, typeof(LenovoAnalyzer.Resources));
-    private static readonly LocalizableString SEC002_Description = new LocalizableResourceString("SEC002_Description", LenovoAnalyzer.Resources.ResourceManager, typeof(LenovoAnalyzer.Resources));
+        SEC001Id, "SEC001", "SEC001", "Security", DiagnosticSeverity.Warning, isEnabledByDefault: true);
+    public const string SEC002Id = "SEC002";
     private static readonly DiagnosticDescriptor PathTraversalRule = new DiagnosticDescriptor(
-        PathTraversalId,
-        SEC002_Title,
-        SEC002_MessageFormat,
-        "Security",
-        DiagnosticSeverity.Warning,
-        isEnabledByDefault: true,
-        description: SEC002_Description);
-
-        public const string SqlInjectionId = "SEC003";
-    private static readonly LocalizableString SEC003_Title = new LocalizableResourceString("SEC003_Title", LenovoAnalyzer.Resources.ResourceManager, typeof(LenovoAnalyzer.Resources));
-    private static readonly LocalizableString SEC003_MessageFormat = new LocalizableResourceString("SEC003_MessageFormat", LenovoAnalyzer.Resources.ResourceManager, typeof(LenovoAnalyzer.Resources));
-    private static readonly LocalizableString SEC003_Description = new LocalizableResourceString("SEC003_Description", LenovoAnalyzer.Resources.ResourceManager, typeof(LenovoAnalyzer.Resources));
+        SEC002Id, "SEC002", "SEC002", "Security", DiagnosticSeverity.Warning, isEnabledByDefault: true);
+    public const string SEC003Id = "SEC003";
     private static readonly DiagnosticDescriptor SqlInjectionRule = new DiagnosticDescriptor(
-        SqlInjectionId,
-        SEC003_Title,
-        SEC003_MessageFormat,
-        "Security",
-        DiagnosticSeverity.Warning,
-        isEnabledByDefault: true,
-        description: SEC003_Description);
-
-        public const string UnsafeDeserializationId = "SEC004";
-    private static readonly LocalizableString SEC004_Title = new LocalizableResourceString("SEC004_Title", LenovoAnalyzer.Resources.ResourceManager, typeof(LenovoAnalyzer.Resources));
-    private static readonly LocalizableString SEC004_MessageFormat = new LocalizableResourceString("SEC004_MessageFormat", LenovoAnalyzer.Resources.ResourceManager, typeof(LenovoAnalyzer.Resources));
-    private static readonly LocalizableString SEC004_Description = new LocalizableResourceString("SEC004_Description", LenovoAnalyzer.Resources.ResourceManager, typeof(LenovoAnalyzer.Resources));
+        SEC003Id, "SEC003", "SEC003", "Security", DiagnosticSeverity.Warning, isEnabledByDefault: true);
+    public const string SEC004Id = "SEC004";
     private static readonly DiagnosticDescriptor UnsafeDeserializationRule = new DiagnosticDescriptor(
-        UnsafeDeserializationId,
-        SEC004_Title,
-        SEC004_MessageFormat,
-        "Security",
-        DiagnosticSeverity.Warning,
-        isEnabledByDefault: true,
-        description: SEC004_Description);
-
-        public const string InsecureRandomId = "SEC005";
-    private static readonly LocalizableString SEC005_Title = new LocalizableResourceString("SEC005_Title", LenovoAnalyzer.Resources.ResourceManager, typeof(LenovoAnalyzer.Resources));
-    private static readonly LocalizableString SEC005_MessageFormat = new LocalizableResourceString("SEC005_MessageFormat", LenovoAnalyzer.Resources.ResourceManager, typeof(LenovoAnalyzer.Resources));
-    private static readonly LocalizableString SEC005_Description = new LocalizableResourceString("SEC005_Description", LenovoAnalyzer.Resources.ResourceManager, typeof(LenovoAnalyzer.Resources));
+        SEC004Id, "SEC004", "SEC004", "Security", DiagnosticSeverity.Warning, isEnabledByDefault: true);
+    public const string SEC005Id = "SEC005";
     private static readonly DiagnosticDescriptor InsecureRandomRule = new DiagnosticDescriptor(
-        InsecureRandomId,
-        SEC005_Title,
-        SEC005_MessageFormat,
-        "Security",
-        DiagnosticSeverity.Warning,
-        isEnabledByDefault: true,
-        description: SEC005_Description);
-
-        public const string RegexDosId = "SEC006";
-    private static readonly LocalizableString SEC006_Title = new LocalizableResourceString("SEC006_Title", LenovoAnalyzer.Resources.ResourceManager, typeof(LenovoAnalyzer.Resources));
-    private static readonly LocalizableString SEC006_MessageFormat = new LocalizableResourceString("SEC006_MessageFormat", LenovoAnalyzer.Resources.ResourceManager, typeof(LenovoAnalyzer.Resources));
-    private static readonly LocalizableString SEC006_Description = new LocalizableResourceString("SEC006_Description", LenovoAnalyzer.Resources.ResourceManager, typeof(LenovoAnalyzer.Resources));
+        SEC005Id, "SEC005", "SEC005", "Security", DiagnosticSeverity.Warning, isEnabledByDefault: true);
+    public const string SEC006Id = "SEC006";
     private static readonly DiagnosticDescriptor RegexDosRule = new DiagnosticDescriptor(
-        RegexDosId,
-        SEC006_Title,
-        SEC006_MessageFormat,
-        "Security",
-        DiagnosticSeverity.Warning,
-        isEnabledByDefault: true,
-        description: SEC006_Description);
-
-        public const string ResourceLeakId = "SEC007";
-    private static readonly LocalizableString SEC007_Title = new LocalizableResourceString("SEC007_Title", LenovoAnalyzer.Resources.ResourceManager, typeof(LenovoAnalyzer.Resources));
-    private static readonly LocalizableString SEC007_MessageFormat = new LocalizableResourceString("SEC007_MessageFormat", LenovoAnalyzer.Resources.ResourceManager, typeof(LenovoAnalyzer.Resources));
-    private static readonly LocalizableString SEC007_Description = new LocalizableResourceString("SEC007_Description", LenovoAnalyzer.Resources.ResourceManager, typeof(LenovoAnalyzer.Resources));
+        SEC006Id, "SEC006", "SEC006", "Security", DiagnosticSeverity.Warning, isEnabledByDefault: true);
+    public const string SEC007Id = "SEC007";
     private static readonly DiagnosticDescriptor ResourceLeakRule = new DiagnosticDescriptor(
-        ResourceLeakId,
-        SEC007_Title,
-        SEC007_MessageFormat,
-        "Security",
-        DiagnosticSeverity.Warning,
-        isEnabledByDefault: true,
-        description: SEC007_Description);
-
-        public const string InsecureTempFileId = "SEC008";
-    private static readonly LocalizableString SEC008_Title = new LocalizableResourceString("SEC008_Title", LenovoAnalyzer.Resources.ResourceManager, typeof(LenovoAnalyzer.Resources));
-    private static readonly LocalizableString SEC008_MessageFormat = new LocalizableResourceString("SEC008_MessageFormat", LenovoAnalyzer.Resources.ResourceManager, typeof(LenovoAnalyzer.Resources));
-    private static readonly LocalizableString SEC008_Description = new LocalizableResourceString("SEC008_Description", LenovoAnalyzer.Resources.ResourceManager, typeof(LenovoAnalyzer.Resources));
+        SEC007Id, "SEC007", "SEC007", "Security", DiagnosticSeverity.Warning, isEnabledByDefault: true);
+    public const string SEC008Id = "SEC008";
     private static readonly DiagnosticDescriptor InsecureTempFileRule = new DiagnosticDescriptor(
-        InsecureTempFileId,
-        SEC008_Title,
-        SEC008_MessageFormat,
-        "Security",
-        DiagnosticSeverity.Warning,
-        isEnabledByDefault: true,
-        description: SEC008_Description);
-
-        public const string UnsafeReflectionId = "SEC009";
-    private static readonly LocalizableString SEC009_Title = new LocalizableResourceString("SEC009_Title", LenovoAnalyzer.Resources.ResourceManager, typeof(LenovoAnalyzer.Resources));
-    private static readonly LocalizableString SEC009_MessageFormat = new LocalizableResourceString("SEC009_MessageFormat", LenovoAnalyzer.Resources.ResourceManager, typeof(LenovoAnalyzer.Resources));
-    private static readonly LocalizableString SEC009_Description = new LocalizableResourceString("SEC009_Description", LenovoAnalyzer.Resources.ResourceManager, typeof(LenovoAnalyzer.Resources));
+        SEC008Id, "SEC008", "SEC008", "Security", DiagnosticSeverity.Warning, isEnabledByDefault: true);
+    public const string SEC009Id = "SEC009";
     private static readonly DiagnosticDescriptor UnsafeReflectionRule = new DiagnosticDescriptor(
-        UnsafeReflectionId,
-        SEC009_Title,
-        SEC009_MessageFormat,
-        "Security",
-        DiagnosticSeverity.Warning,
-        isEnabledByDefault: true,
-        description: SEC009_Description);
-
-        public const string RaceConditionId = "SEC010";
-    private static readonly LocalizableString SEC010_Title = new LocalizableResourceString("SEC010_Title", LenovoAnalyzer.Resources.ResourceManager, typeof(LenovoAnalyzer.Resources));
-    private static readonly LocalizableString SEC010_MessageFormat = new LocalizableResourceString("SEC010_MessageFormat", LenovoAnalyzer.Resources.ResourceManager, typeof(LenovoAnalyzer.Resources));
-    private static readonly LocalizableString SEC010_Description = new LocalizableResourceString("SEC010_Description", LenovoAnalyzer.Resources.ResourceManager, typeof(LenovoAnalyzer.Resources));
+        SEC009Id, "SEC009", "SEC009", "Security", DiagnosticSeverity.Warning, isEnabledByDefault: true);
+    public const string SEC010Id = "SEC010";
     private static readonly DiagnosticDescriptor RaceConditionRule = new DiagnosticDescriptor(
-        RaceConditionId,
-        SEC010_Title,
-        SEC010_MessageFormat,
-        "Security",
-        DiagnosticSeverity.Warning,
-        isEnabledByDefault: true,
-        description: SEC010_Description);
-
-        public const string InsecureIpcId = "SEC011";
-    private static readonly LocalizableString SEC011_Title = new LocalizableResourceString("SEC011_Title", LenovoAnalyzer.Resources.ResourceManager, typeof(LenovoAnalyzer.Resources));
-    private static readonly LocalizableString SEC011_MessageFormat = new LocalizableResourceString("SEC011_MessageFormat", LenovoAnalyzer.Resources.ResourceManager, typeof(LenovoAnalyzer.Resources));
-    private static readonly LocalizableString SEC011_Description = new LocalizableResourceString("SEC011_Description", LenovoAnalyzer.Resources.ResourceManager, typeof(LenovoAnalyzer.Resources));
+        SEC010Id, "SEC010", "SEC010", "Security", DiagnosticSeverity.Warning, isEnabledByDefault: true);
+    public const string SEC011Id = "SEC011";
     private static readonly DiagnosticDescriptor InsecureIpcRule = new DiagnosticDescriptor(
-        InsecureIpcId,
-        SEC011_Title,
-        SEC011_MessageFormat,
-        "Security",
-        DiagnosticSeverity.Warning,
-        isEnabledByDefault: true,
-        description: SEC011_Description);
+        SEC011Id, "SEC011", "SEC011", "Security", DiagnosticSeverity.Warning, isEnabledByDefault: true);
 
     public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics
         => ImmutableArray.Create(
@@ -287,6 +131,33 @@ public class LenovoQiraCodeAnalyzerAnalyzer : DiagnosticAnalyzer
     {
         "BasicHttpBinding", "WebHttpBinding"
     };
+
+    
+    private void Report(Action<Diagnostic> reportAction, string ruleId, string category, DiagnosticSeverity severity, Location location, params object[] messageArgs)
+    {
+        string title = AnalyzerI18n.GetString(ruleId + "_Title");
+        string messageFormat = AnalyzerI18n.GetString(ruleId + "_MessageFormat");
+        string description = AnalyzerI18n.GetString(ruleId + "_Description");
+
+        for (int i = 0; i < messageArgs.Length; i++)
+        {
+            if (messageArgs[i] is LocalizableArgument la)
+            {
+                messageArgs[i] = la.ToString(null, null);
+            }
+        }
+
+        var descriptor = new DiagnosticDescriptor(
+            ruleId,
+            title,
+            messageFormat,
+            category,
+            severity,
+            isEnabledByDefault: true,
+            description: description);
+
+        reportAction(Diagnostic.Create(descriptor, location, messageArgs));
+    }
 
     public override void Initialize(AnalysisContext context)
     {
@@ -381,7 +252,7 @@ public class LenovoQiraCodeAnalyzerAnalyzer : DiagnosticAnalyzer
 
             if (!string.IsNullOrWhiteSpace(commentText) && chineseRegex.IsMatch(commentText))
             {
-                context.ReportDiagnostic(Diagnostic.Create(Rule, location, commentText));
+                Report(context.ReportDiagnostic, DiagnosticId, "CodeStyle", DiagnosticSeverity.Warning, location, commentText);
             }
         }
 
@@ -395,7 +266,7 @@ public class LenovoQiraCodeAnalyzerAnalyzer : DiagnosticAnalyzer
                 if (!string.IsNullOrEmpty(value) && chineseRegex.IsMatch(value))
                 {
                     var loc = Location.Create(context.Tree, node.Span);
-                    context.ReportDiagnostic(Diagnostic.Create(Rule, loc, value));
+                    Report(context.ReportDiagnostic, DiagnosticId, "CodeStyle", DiagnosticSeverity.Warning, loc, value);
                 }
             }
         }
@@ -419,9 +290,7 @@ public class LenovoQiraCodeAnalyzerAnalyzer : DiagnosticAnalyzer
 
         if (!hasSearchPathsAttr)
         {
-            context.ReportDiagnostic(Diagnostic.Create(
-                MissingDllImportSearchPathsRule,
-                dllImportAttrs.First().GetLocation()));
+            Report(context.ReportDiagnostic, DLL002Id, "CodeStyle", DiagnosticSeverity.Warning, dllImportAttrs.First().GetLocation()));
         }
 
         foreach (var dllImportAttr in dllImportAttrs)
@@ -430,10 +299,8 @@ public class LenovoQiraCodeAnalyzerAnalyzer : DiagnosticAnalyzer
 
             if (string.IsNullOrEmpty(dllName))
             {
-                context.ReportDiagnostic(Diagnostic.Create(
-                    UnsafeDllSignatureRule,
-                    dllImportAttr.GetLocation(),
-                    new LocalizableArgument("DLL003_Arg_Unknown")));
+                Report(context.ReportDiagnostic, DLL003Id, "Security", DiagnosticSeverity.Warning, dllImportAttr.GetLocation(),
+                    new LocalizableArgument("DLL003_Arg_Unknown");
                 continue;
             }
 
@@ -444,19 +311,15 @@ public class LenovoQiraCodeAnalyzerAnalyzer : DiagnosticAnalyzer
 
             if (dllPath == null)
             {
-                context.ReportDiagnostic(Diagnostic.Create(
-                    UnsafeDllSignatureRule,
-                    dllImportAttr.GetLocation(),
-                    new LocalizableArgument("DLL003_Arg_NotFound", dllName)));
+                Report(context.ReportDiagnostic, DLL003Id, "Security", DiagnosticSeverity.Warning, dllImportAttr.GetLocation(),
+                    new LocalizableArgument("DLL003_Arg_NotFound", dllName));
                 continue;
             }
 
             if (!IsDllSigned(dllPath))
             {
-                context.ReportDiagnostic(Diagnostic.Create(
-                    UnsafeDllSignatureRule,
-                    dllImportAttr.GetLocation(),
-                    new LocalizableArgument("DLL003_Arg_InvalidSig", dllName)));
+                Report(context.ReportDiagnostic, DLL003Id, "Security", DiagnosticSeverity.Warning, dllImportAttr.GetLocation(),
+                    new LocalizableArgument("DLL003_Arg_InvalidSig", dllName));
             }
         }
     }
@@ -759,10 +622,8 @@ public class LenovoQiraCodeAnalyzerAnalyzer : DiagnosticAnalyzer
         foreach (var usage in stackTraceUsages)
         {
             string usageText = usage.ToString();
-            context.ReportDiagnostic(Diagnostic.Create(
-                InvalidStackTraceUsageRule,
-                usage.GetLocation(),
-                usageText));
+            Report(context.ReportDiagnostic, EXC001Id, "Security", DiagnosticSeverity.Warning, usage.GetLocation(),
+                usageText);
         }
     }
 
@@ -809,10 +670,8 @@ public class LenovoQiraCodeAnalyzerAnalyzer : DiagnosticAnalyzer
                 if (IsLargeCodeBlock(commentText, 1))
                 {
                     var location = Location.Create(context.Tree, trivia.Span);
-                    context.ReportDiagnostic(Diagnostic.Create(
-                        InvalidCommentedCodeRule,
-                        location,
-                        TruncateLongText(commentText, 50)));
+                    Report(context.ReportDiagnostic, CODE001Id, "CodeStyle", DiagnosticSeverity.Warning, location,
+                        TruncateLongText(commentText, 50));
                 }
                 processedSpans.Add(trivia.Span.Start);
                 continue;
@@ -884,10 +743,8 @@ public class LenovoQiraCodeAnalyzerAnalyzer : DiagnosticAnalyzer
                     var spanStart = commentGroup.First().Span.Start;
                     var spanEnd = commentGroup.Last().Span.End;
                     var location = Location.Create(context.Tree, new TextSpan(spanStart, spanEnd - spanStart));
-                    context.ReportDiagnostic(Diagnostic.Create(
-                        InvalidCommentedCodeRule,
-                        location,
-                        TruncateLongText(combinedText, 50)));
+                    Report(context.ReportDiagnostic, CODE001Id, "CodeStyle", DiagnosticSeverity.Warning, location,
+                        TruncateLongText(combinedText, 50));
                 }
             }
         }
@@ -946,11 +803,9 @@ public class LenovoQiraCodeAnalyzerAnalyzer : DiagnosticAnalyzer
                 variable.Initializer?.Value is LiteralExpressionSyntax literalExpr &&
                 literalExpr.IsKind(SyntaxKind.StringLiteralExpression))
             {
-                context.ReportDiagnostic(Diagnostic.Create(
-                    SensitiveInfoInCodeRule,
-                    variable.GetLocation(),
+                Report(context.ReportDiagnostic, SEC001Id, "Security", DiagnosticSeverity.Warning, variable.GetLocation(),
                     varName,
-                    plainTextValue));
+                    plainTextValue);
             }
         }
     }
@@ -967,11 +822,9 @@ public class LenovoQiraCodeAnalyzerAnalyzer : DiagnosticAnalyzer
             string varName = identifierName.Identifier.Text;
             string plainTextValue = literal.Token.ValueText ?? string.Empty;
 
-            context.ReportDiagnostic(Diagnostic.Create(
-                SensitiveInfoInCodeRule,
-                assignment.GetLocation(),
+            Report(context.ReportDiagnostic, SEC001Id, "Security", DiagnosticSeverity.Warning, assignment.GetLocation(),
                 varName,
-                plainTextValue));
+                plainTextValue);
         }
     }
 
@@ -1009,10 +862,8 @@ public class LenovoQiraCodeAnalyzerAnalyzer : DiagnosticAnalyzer
         {
             if (IsSuspiciousPathArgument(arg.Expression))
             {
-                context.ReportDiagnostic(Diagnostic.Create(
-                    PathTraversalRule,
-                    arg.GetLocation(),
-                    new LocalizableArgument("SEC002_Arg_Method", methodName)));
+                Report(context.ReportDiagnostic, SEC002Id, "Security", DiagnosticSeverity.Warning, arg.GetLocation(),
+                    new LocalizableArgument("SEC002_Arg_Method", methodName));
                 return;
             }
         }
@@ -1035,10 +886,8 @@ public class LenovoQiraCodeAnalyzerAnalyzer : DiagnosticAnalyzer
             // 检查另一侧是否包含可疑输入
             if (IsSuspiciousPathArgument(binaryExpr.Left) || IsSuspiciousPathArgument(binaryExpr.Right))
             {
-                context.ReportDiagnostic(Diagnostic.Create(
-                    PathTraversalRule,
-                    binaryExpr.GetLocation(),
-                    new LocalizableArgument("SEC002_Arg_Concat")));
+                Report(context.ReportDiagnostic, SEC002Id, "Security", DiagnosticSeverity.Warning, binaryExpr.GetLocation(),
+                    new LocalizableArgument("SEC002_Arg_Concat"));
             }
         }
     }
@@ -1062,10 +911,8 @@ public class LenovoQiraCodeAnalyzerAnalyzer : DiagnosticAnalyzer
             if (content is InterpolationSyntax interp &&
                 IsSuspiciousPathArgument(interp.Expression))
             {
-                context.ReportDiagnostic(Diagnostic.Create(
-                    PathTraversalRule,
-                    interp.GetLocation(),
-                    new LocalizableArgument("SEC002_Arg_Interpolation")));
+                Report(context.ReportDiagnostic, SEC002Id, "Security", DiagnosticSeverity.Warning, interp.GetLocation(),
+                    new LocalizableArgument("SEC002_Arg_Interpolation"));
                 return;
             }
         }
@@ -1271,11 +1118,9 @@ public class LenovoQiraCodeAnalyzerAnalyzer : DiagnosticAnalyzer
         if (buildMethod == null)
             return;
 
-        context.ReportDiagnostic(Diagnostic.Create(
-            SqlInjectionRule,
-            firstArg.GetLocation(),
+        Report(context.ReportDiagnostic, SEC003Id, "Security", DiagnosticSeverity.Warning, firstArg.GetLocation(),
             typeName,
-            buildMethod));
+            buildMethod);
     }
 
     /// <summary>
@@ -1295,11 +1140,9 @@ public class LenovoQiraCodeAnalyzerAnalyzer : DiagnosticAnalyzer
         if (buildMethod == null)
             return;
 
-        context.ReportDiagnostic(Diagnostic.Create(
-            SqlInjectionRule,
-            assignment.Right.GetLocation(),
+        Report(context.ReportDiagnostic, SEC003Id, "Security", DiagnosticSeverity.Warning, assignment.Right.GetLocation(),
             "CommandText",
-            buildMethod));
+            buildMethod);
     }
 
     /// <summary>
@@ -1335,11 +1178,9 @@ public class LenovoQiraCodeAnalyzerAnalyzer : DiagnosticAnalyzer
         if (buildMethod == null)
             return;
 
-        context.ReportDiagnostic(Diagnostic.Create(
-            SqlInjectionRule,
-            firstArg.GetLocation(),
+        Report(context.ReportDiagnostic, SEC003Id, "Security", DiagnosticSeverity.Warning, firstArg.GetLocation(),
             methodName,
-            buildMethod));
+            buildMethod);
     }
 
     // ═════════════════════════════════════════════════════════════════
@@ -1356,10 +1197,8 @@ public class LenovoQiraCodeAnalyzerAnalyzer : DiagnosticAnalyzer
 
         if (UnsafeSerializerTypes.Contains(typeName))
         {
-            context.ReportDiagnostic(Diagnostic.Create(
-                UnsafeDeserializationRule,
-                objectCreation.GetLocation(),
-                new LocalizableArgument("SEC004_Arg_NewType", typeName)));
+            Report(context.ReportDiagnostic, SEC004Id, "Security", DiagnosticSeverity.Warning, objectCreation.GetLocation(),
+                new LocalizableArgument("SEC004_Arg_NewType", typeName));
         }
     }
 
@@ -1391,10 +1230,8 @@ public class LenovoQiraCodeAnalyzerAnalyzer : DiagnosticAnalyzer
             if (rightText.EndsWith($".{unsafeValue}", StringComparison.Ordinal) ||
                 rightText.Equals(unsafeValue, StringComparison.Ordinal))
             {
-                context.ReportDiagnostic(Diagnostic.Create(
-                    UnsafeDeserializationRule,
-                    assignment.GetLocation(),
-                    new LocalizableArgument("SEC004_Arg_HandlingUnsafe", rightText)));
+                Report(context.ReportDiagnostic, SEC004Id, "Security", DiagnosticSeverity.Warning, assignment.GetLocation(),
+                    new LocalizableArgument("SEC004_Arg_HandlingUnsafe", rightText));
                 return;
             }
         }
@@ -1402,10 +1239,8 @@ public class LenovoQiraCodeAnalyzerAnalyzer : DiagnosticAnalyzer
         // 如果是其他值（可能是变量），也报告
         if (!rightText.Contains("None"))
         {
-            context.ReportDiagnostic(Diagnostic.Create(
-                UnsafeDeserializationRule,
-                assignment.GetLocation(),
-                new LocalizableArgument("SEC004_Arg_HandlingRecommend", rightText)));
+            Report(context.ReportDiagnostic, SEC004Id, "Security", DiagnosticSeverity.Warning, assignment.GetLocation(),
+                new LocalizableArgument("SEC004_Arg_HandlingRecommend", rightText));
         }
     }
 
@@ -1433,10 +1268,8 @@ public class LenovoQiraCodeAnalyzerAnalyzer : DiagnosticAnalyzer
             fullText.IndexOf("Strong", StringComparison.OrdinalIgnoreCase) >= 0)
             return;
 
-        context.ReportDiagnostic(Diagnostic.Create(
-            InsecureRandomRule,
-            objectCreation.GetLocation(),
-            new LocalizableArgument("SEC005_Arg_Construct")));
+        Report(context.ReportDiagnostic, SEC005Id, "Security", DiagnosticSeverity.Warning, objectCreation.GetLocation(),
+            new LocalizableArgument("SEC005_Arg_Construct"));
     }
 
     /// <summary>
@@ -1460,10 +1293,8 @@ public class LenovoQiraCodeAnalyzerAnalyzer : DiagnosticAnalyzer
             !callerText.Contains("Secure") &&
             !callerText.Contains("Security"))
         {
-            context.ReportDiagnostic(Diagnostic.Create(
-                InsecureRandomRule,
-                invocation.GetLocation(),
-                new LocalizableArgument("SEC005_Arg_MethodCall", methodName)));
+            Report(context.ReportDiagnostic, SEC005Id, "Security", DiagnosticSeverity.Warning, invocation.GetLocation(),
+                new LocalizableArgument("SEC005_Arg_MethodCall", methodName));
         }
     }
 
@@ -1495,10 +1326,8 @@ public class LenovoQiraCodeAnalyzerAnalyzer : DiagnosticAnalyzer
         if (argCount == 0)
             return;
 
-        context.ReportDiagnostic(Diagnostic.Create(
-            RegexDosRule,
-            objectCreation.GetLocation(),
-            new LocalizableArgument("SEC006_Arg_NewRegex")));
+        Report(context.ReportDiagnostic, SEC006Id, "Security", DiagnosticSeverity.Warning, objectCreation.GetLocation(),
+            new LocalizableArgument("SEC006_Arg_NewRegex"));
     }
 
     /// <summary>
@@ -1552,10 +1381,8 @@ public class LenovoQiraCodeAnalyzerAnalyzer : DiagnosticAnalyzer
 
         if (!hasTimeoutOverload)
         {
-            context.ReportDiagnostic(Diagnostic.Create(
-                RegexDosRule,
-                invocation.GetLocation(),
-                new LocalizableArgument("SEC006_Arg_StaticRegex", methodName)));
+            Report(context.ReportDiagnostic, SEC006Id, "Security", DiagnosticSeverity.Warning, invocation.GetLocation(),
+                new LocalizableArgument("SEC006_Arg_StaticRegex", methodName));
         }
     }
 
@@ -1626,10 +1453,8 @@ public class LenovoQiraCodeAnalyzerAnalyzer : DiagnosticAnalyzer
             if (!DisposableTypeNames.Contains(typeName))
                 continue;
 
-            context.ReportDiagnostic(Diagnostic.Create(
-                ResourceLeakRule,
-                variable.GetLocation(),
-                typeName));
+            Report(context.ReportDiagnostic, SEC007Id, "Security", DiagnosticSeverity.Warning, variable.GetLocation(),
+                typeName);
         }
     }
 
@@ -1783,10 +1608,8 @@ public class LenovoQiraCodeAnalyzerAnalyzer : DiagnosticAnalyzer
             LocalizableArgument predictablePattern = GetPredictableTempFilePattern(args[i].Expression);
             if (predictablePattern != null)
             {
-                context.ReportDiagnostic(Diagnostic.Create(
-                    InsecureTempFileRule,
-                    args[i].GetLocation(),
-                    predictablePattern));
+                Report(context.ReportDiagnostic, SEC008Id, "Security", DiagnosticSeverity.Warning, args[i].GetLocation(),
+                    predictablePattern);
                 return; // 每个 Path.Combine 调用只报告一次
             }
         }
@@ -1820,10 +1643,8 @@ public class LenovoQiraCodeAnalyzerAnalyzer : DiagnosticAnalyzer
                     var arg = invocation.ArgumentList.Arguments[0].Expression;
                     if (!IsStringLiteral(arg))
                     {
-                        context.ReportDiagnostic(Diagnostic.Create(
-                            UnsafeReflectionRule,
-                            invocation.GetLocation(),
-                            new LocalizableArgument("SEC009_Arg_GetType")));
+                        Report(context.ReportDiagnostic, SEC009Id, "Security", DiagnosticSeverity.Warning, invocation.GetLocation(),
+                            new LocalizableArgument("SEC009_Arg_GetType"));
                     }
                 }
             }
@@ -1841,10 +1662,8 @@ public class LenovoQiraCodeAnalyzerAnalyzer : DiagnosticAnalyzer
                     var argText = arg.Expression.ToString();
                     if (argText.Contains("NonPublic"))
                     {
-                        context.ReportDiagnostic(Diagnostic.Create(
-                            UnsafeReflectionRule,
-                            invocation.GetLocation(),
-                            new LocalizableArgument("SEC009_Arg_NonPublic", methodName)));
+                        Report(context.ReportDiagnostic, SEC009Id, "Security", DiagnosticSeverity.Warning, invocation.GetLocation(),
+                            new LocalizableArgument("SEC009_Arg_NonPublic", methodName));
                         return;
                     }
                 }
@@ -1857,10 +1676,8 @@ public class LenovoQiraCodeAnalyzerAnalyzer : DiagnosticAnalyzer
             var callerText = memberAccess.Expression.ToString();
             if (callerText.Contains("GetMethod") || callerText.Contains("method"))
             {
-                context.ReportDiagnostic(Diagnostic.Create(
-                    UnsafeReflectionRule,
-                    invocation.GetLocation(),
-                    new LocalizableArgument("SEC009_Arg_Invoke")));
+                Report(context.ReportDiagnostic, SEC009Id, "Security", DiagnosticSeverity.Warning, invocation.GetLocation(),
+                    new LocalizableArgument("SEC009_Arg_Invoke"));
             }
         }
     }
@@ -1899,10 +1716,8 @@ public class LenovoQiraCodeAnalyzerAnalyzer : DiagnosticAnalyzer
         // 检查是否在 Interlocked 调用中
         if (IsInsideInterlockedCall(increment)) return;
 
-        context.ReportDiagnostic(Diagnostic.Create(
-            RaceConditionRule,
-            increment.GetLocation(),
-            new LocalizableArgument("SEC010_Arg_Increment")));
+        Report(context.ReportDiagnostic, SEC010Id, "Security", DiagnosticSeverity.Warning, increment.GetLocation(),
+            new LocalizableArgument("SEC010_Arg_Increment"));
     }
 
     /// <summary>
@@ -1924,10 +1739,8 @@ public class LenovoQiraCodeAnalyzerAnalyzer : DiagnosticAnalyzer
         if (IsInsideLockStatement(decrement)) return;
         if (IsInsideInterlockedCall(decrement)) return;
 
-        context.ReportDiagnostic(Diagnostic.Create(
-            RaceConditionRule,
-            decrement.GetLocation(),
-            new LocalizableArgument("SEC010_Arg_Decrement")));
+        Report(context.ReportDiagnostic, SEC010Id, "Security", DiagnosticSeverity.Warning, decrement.GetLocation(),
+            new LocalizableArgument("SEC010_Arg_Decrement"));
     }
 
     /// <summary>
@@ -1941,10 +1754,8 @@ public class LenovoQiraCodeAnalyzerAnalyzer : DiagnosticAnalyzer
         if (IsInsideLockStatement(assignment)) return;
 
         string opText = assignment.OperatorToken.Text;
-        context.ReportDiagnostic(Diagnostic.Create(
-            RaceConditionRule,
-            assignment.GetLocation(),
-            new LocalizableArgument("SEC010_Arg_Compound", opText)));
+        Report(context.ReportDiagnostic, SEC010Id, "Security", DiagnosticSeverity.Warning, assignment.GetLocation(),
+            new LocalizableArgument("SEC010_Arg_Compound", opText));
     }
 
     /// <summary>
@@ -1969,10 +1780,8 @@ public class LenovoQiraCodeAnalyzerAnalyzer : DiagnosticAnalyzer
         {
             if (bodyModifications.Contains(field))
             {
-                context.ReportDiagnostic(Diagnostic.Create(
-                    RaceConditionRule,
-                    ifStatement.GetLocation(),
-                    new LocalizableArgument("SEC010_Arg_CheckThenUse", field)));
+                Report(context.ReportDiagnostic, SEC010Id, "Security", DiagnosticSeverity.Warning, ifStatement.GetLocation(),
+                    new LocalizableArgument("SEC010_Arg_CheckThenUse", field));
                 return;
             }
         }
@@ -2008,10 +1817,8 @@ public class LenovoQiraCodeAnalyzerAnalyzer : DiagnosticAnalyzer
             {
                 if (callerText.Contains(collType) || IsNonThreadSafeCollectionField(memberAccess.Expression))
                 {
-                    context.ReportDiagnostic(Diagnostic.Create(
-                        RaceConditionRule,
-                        invocation.GetLocation(),
-                        new LocalizableArgument("SEC010_Arg_CollectionMethod", methodName)));
+                    Report(context.ReportDiagnostic, SEC010Id, "Security", DiagnosticSeverity.Warning, invocation.GetLocation(),
+                        new LocalizableArgument("SEC010_Arg_CollectionMethod", methodName));
                     return;
                 }
             }
@@ -2138,10 +1945,8 @@ public class LenovoQiraCodeAnalyzerAnalyzer : DiagnosticAnalyzer
         // 检查是否在 lock 内
         if (IsInsideLockStatement(assignment)) return;
 
-        context.ReportDiagnostic(Diagnostic.Create(
-            RaceConditionRule,
-            assignment.GetLocation(),
-            new LocalizableArgument("SEC010_Arg_CollectionIndexer")));
+        Report(context.ReportDiagnostic, SEC010Id, "Security", DiagnosticSeverity.Warning, assignment.GetLocation(),
+            new LocalizableArgument("SEC010_Arg_CollectionIndexer"));
     }
 
     /// <summary>
@@ -2197,10 +2002,8 @@ public class LenovoQiraCodeAnalyzerAnalyzer : DiagnosticAnalyzer
             // 检查是否传入了安全模式参数
             if (objectCreation.ArgumentList == null || objectCreation.ArgumentList.Arguments.Count == 0)
             {
-                context.ReportDiagnostic(Diagnostic.Create(
-                    InsecureIpcRule,
-                    objectCreation.GetLocation(),
-                    new LocalizableArgument("SEC011_Arg_BasicHttp")));
+                Report(context.ReportDiagnostic, SEC011Id, "Security", DiagnosticSeverity.Warning, objectCreation.GetLocation(),
+                    new LocalizableArgument("SEC011_Arg_BasicHttp"));
                 return;
             }
         }
@@ -2214,10 +2017,8 @@ public class LenovoQiraCodeAnalyzerAnalyzer : DiagnosticAnalyzer
                 var argText = objectCreation.ArgumentList.Arguments[0].Expression.ToString();
                 if (argText.Contains("SecurityMode.None") || argText.EndsWith(".None"))
                 {
-                    context.ReportDiagnostic(Diagnostic.Create(
-                        InsecureIpcRule,
-                        objectCreation.GetLocation(),
-                        new LocalizableArgument("SEC011_Arg_SecurityNone", typeName)));
+                    Report(context.ReportDiagnostic, SEC011Id, "Security", DiagnosticSeverity.Warning, objectCreation.GetLocation(),
+                        new LocalizableArgument("SEC011_Arg_SecurityNone", typeName));
                 }
             }
         }
@@ -2240,10 +2041,8 @@ public class LenovoQiraCodeAnalyzerAnalyzer : DiagnosticAnalyzer
                 var arg = objectCreation.ArgumentList.Arguments[0].Expression;
                 if (IsInsecureHttpUrl(arg))
                 {
-                    context.ReportDiagnostic(Diagnostic.Create(
-                        InsecureIpcRule,
-                        objectCreation.GetLocation(),
-                        new LocalizableArgument("SEC011_Arg_HttpEndpoint")));
+                    Report(context.ReportDiagnostic, SEC011Id, "Security", DiagnosticSeverity.Warning, objectCreation.GetLocation(),
+                        new LocalizableArgument("SEC011_Arg_HttpEndpoint"));
                 }
             }
         }
@@ -2272,10 +2071,8 @@ public class LenovoQiraCodeAnalyzerAnalyzer : DiagnosticAnalyzer
                     var arg = invocation.ArgumentList.Arguments[0].Expression;
                     if (IsInsecureHttpUrl(arg))
                     {
-                        context.ReportDiagnostic(Diagnostic.Create(
-                            InsecureIpcRule,
-                            invocation.GetLocation(),
-                            new LocalizableArgument("SEC011_Arg_GrpcHttp")));
+                        Report(context.ReportDiagnostic, SEC011Id, "Security", DiagnosticSeverity.Warning, invocation.GetLocation(),
+                            new LocalizableArgument("SEC011_Arg_GrpcHttp"));
                     }
                 }
             }
@@ -2292,10 +2089,8 @@ public class LenovoQiraCodeAnalyzerAnalyzer : DiagnosticAnalyzer
                 var arg = invocation.ArgumentList.Arguments[0].Expression;
                 if (IsInsecureHttpUrl(arg))
                 {
-                    context.ReportDiagnostic(Diagnostic.Create(
-                        InsecureIpcRule,
-                        invocation.GetLocation(),
-                        new LocalizableArgument("SEC011_Arg_WebClientHttp", methodName)));
+                    Report(context.ReportDiagnostic, SEC011Id, "Security", DiagnosticSeverity.Warning, invocation.GetLocation(),
+                        new LocalizableArgument("SEC011_Arg_WebClientHttp", methodName));
                 }
             }
         }

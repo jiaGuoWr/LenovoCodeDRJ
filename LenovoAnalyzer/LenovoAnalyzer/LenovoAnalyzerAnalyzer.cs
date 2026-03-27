@@ -1,17 +1,18 @@
 using System;
 using System.Collections.Immutable;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
 using System.Security.Cryptography.X509Certificates;
 using System.Security.Cryptography;
+using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Diagnostics;
-using System.Collections.Generic;
 using Microsoft.CodeAnalysis.Text;
 using LenovoAnalyzer;
 
@@ -223,6 +224,14 @@ public class LenovoQiraCodeAnalyzerAnalyzer : DiagnosticAnalyzer
         "BasicHttpBinding", "WebHttpBinding"
     };
 
+    // 预编译的正则表达式（性能优化：避免重复创建）
+    private static readonly Regex ChineseCharRegex = new Regex(@"[\u4e00-\u9fa5]", RegexOptions.Compiled);
+    private static readonly Regex XmlDocCommentPrefixRegex = new Regex(@"^\s*///", RegexOptions.Compiled | RegexOptions.Multiline);
+    private static readonly Regex XmlDocCommentStripRegex = new Regex(@"^\s*///\s*", RegexOptions.Compiled | RegexOptions.Multiline);
+    private static readonly Regex SingleLineCommentPrefixRegex = new Regex(@"^\s*//", RegexOptions.Compiled | RegexOptions.Multiline);
+    private static readonly Regex SingleLineCommentStripRegex = new Regex(@"^\s*//\s*", RegexOptions.Compiled | RegexOptions.Multiline);
+    private static readonly Regex BlockCommentStripRegex = new Regex(@"^\s*/\*|\*/\s*$", RegexOptions.Compiled | RegexOptions.Multiline);
+
     private static readonly Dictionary<string, DiagnosticDescriptor> DescriptorMap = new Dictionary<string, DiagnosticDescriptor>
     {
         [DiagnosticId] = Rule,
@@ -331,30 +340,33 @@ public class LenovoQiraCodeAnalyzerAnalyzer : DiagnosticAnalyzer
         if (context.CancellationToken.IsCancellationRequested) return;
 
         var root = context.Tree.GetRoot();
-        var chineseRegex = new Regex(@"[\u4e00-\u9fa5]", RegexOptions.Compiled);
 
         foreach (var trivia in root.DescendantTrivia(descendIntoTrivia: true))
         {
+            // 支持取消操作
+            if (context.CancellationToken.IsCancellationRequested) return;
+            
             string rawText = trivia.ToString().Trim();
             if (string.IsNullOrWhiteSpace(rawText)) continue;
 
             string commentText = null;
             var location = Location.Create(context.Tree, trivia.Span);
 
-            if (Regex.IsMatch(rawText, @"^\s*///", RegexOptions.Multiline))
+            // 使用预编译的静态正则表达式
+            if (XmlDocCommentPrefixRegex.IsMatch(rawText))
             {
-                commentText = Regex.Replace(rawText, @"^\s*///\s*", "", RegexOptions.Multiline).Trim();
+                commentText = XmlDocCommentStripRegex.Replace(rawText, "").Trim();
             }
-            else if (Regex.IsMatch(rawText, @"^\s*//", RegexOptions.Multiline) && !Regex.IsMatch(rawText, @"^\s*///", RegexOptions.Multiline))
+            else if (SingleLineCommentPrefixRegex.IsMatch(rawText) && !XmlDocCommentPrefixRegex.IsMatch(rawText))
             {
-                commentText = Regex.Replace(rawText, @"^\s*//\s*", "", RegexOptions.Multiline).Trim();
+                commentText = SingleLineCommentStripRegex.Replace(rawText, "").Trim();
             }
             else if (rawText.StartsWith("/*") && rawText.EndsWith("*/"))
             {
-                commentText = Regex.Replace(rawText, @"^\s*/\*|\*/\s*$", "", RegexOptions.Multiline).Trim();
+                commentText = BlockCommentStripRegex.Replace(rawText, "").Trim();
             }
 
-            if (!string.IsNullOrWhiteSpace(commentText) && chineseRegex.IsMatch(commentText))
+            if (!string.IsNullOrWhiteSpace(commentText) && ChineseCharRegex.IsMatch(commentText))
             {
                 Report(context.ReportDiagnostic, DiagnosticId, "CodeStyle", DiagnosticSeverity.Warning, location, commentText);
             }
@@ -363,11 +375,14 @@ public class LenovoQiraCodeAnalyzerAnalyzer : DiagnosticAnalyzer
         // 检测字符串字面量中的中文字符
         foreach (var node in root.DescendantNodes())
         {
+            // 支持取消操作
+            if (context.CancellationToken.IsCancellationRequested) return;
+            
             if (node.IsKind(SyntaxKind.StringLiteralExpression))
             {
                 var literal = (LiteralExpressionSyntax)node;
                 var value = literal.Token.ValueText;
-                if (!string.IsNullOrEmpty(value) && chineseRegex.IsMatch(value))
+                if (!string.IsNullOrEmpty(value) && ChineseCharRegex.IsMatch(value))
                 {
                     var loc = Location.Create(context.Tree, node.Span);
                     Report(context.ReportDiagnostic, DiagnosticId, "CodeStyle", DiagnosticSeverity.Warning, loc, value);
@@ -399,7 +414,8 @@ public class LenovoQiraCodeAnalyzerAnalyzer : DiagnosticAnalyzer
 
         foreach (var dllImportAttr in dllImportAttrs)
         {
-            var dllName = GetDllNameFromAttribute(dllImportAttr);
+            // 使用增强的 DLL 名称解析方法（支持常量/变量引用）
+            var dllName = GetDllNameFromAttribute(dllImportAttr, context);
 
             if (string.IsNullOrEmpty(dllName))
             {
@@ -408,6 +424,9 @@ public class LenovoQiraCodeAnalyzerAnalyzer : DiagnosticAnalyzer
                 continue;
             }
 
+            // 规范化 DLL 名称用于诊断消息（如 "kernel32" -> "kernel32.dll"）
+            var normalizedDllName = NormalizeDllName(dllName);
+            
             var searchPath = GetSearchPathFromAttributes(method, context);
 
             // 严格模式查找：只在指定路径中查找，不回退到系统目录
@@ -416,14 +435,14 @@ public class LenovoQiraCodeAnalyzerAnalyzer : DiagnosticAnalyzer
             if (dllPath == null)
             {
                 Report(context.ReportDiagnostic, DLL003Id, "Security", DiagnosticSeverity.Warning, dllImportAttr.GetLocation(),
-                    new LocalizableArgument("DLL003_Arg_NotFound", dllName));
+                    new LocalizableArgument("DLL003_Arg_NotFound", normalizedDllName));
                 continue;
             }
 
             if (!IsDllSigned(dllPath))
             {
                 Report(context.ReportDiagnostic, DLL003Id, "Security", DiagnosticSeverity.Warning, dllImportAttr.GetLocation(),
-                    new LocalizableArgument("DLL003_Arg_InvalidSig", dllName));
+                    new LocalizableArgument("DLL003_Arg_InvalidSig", normalizedDllName));
             }
         }
     }
@@ -500,32 +519,96 @@ public class LenovoQiraCodeAnalyzerAnalyzer : DiagnosticAnalyzer
                 return null;
 
             var paths = new List<string>();
+            string codeFilePath = context.Node.SyntaxTree.FilePath;
+            string projectDir = null;
+            
+            if (!string.IsNullOrEmpty(codeFilePath))
+            {
+                projectDir = FindProjectTopDirectory(codeFilePath);
+            }
+            
             foreach (var value in searchPathValues)
             {
                 switch (value)
                 {
                     case DllImportSearchPath.ApplicationDirectory:
-                        string codeFilePath = context.Node.SyntaxTree.FilePath;
-                        if (!string.IsNullOrEmpty(codeFilePath))
+                        if (!string.IsNullOrEmpty(projectDir))
                         {
-                            string projectDir = FindProjectTopDirectory(codeFilePath);
-                            if (!string.IsNullOrEmpty(projectDir))
+                            // 探测多个可能的输出路径
+                            var possiblePaths = GetPossibleOutputPaths(projectDir);
+                            foreach (var dllDir in possiblePaths)
                             {
-                                // 探测多个可能的输出路径
-                                var possiblePaths = GetPossibleOutputPaths(projectDir);
-                                foreach (var dllDir in possiblePaths)
-                                {
-                                    if (Directory.Exists(dllDir))
-                                        paths.Add(dllDir);
-                                }
+                                if (Directory.Exists(dllDir))
+                                    paths.Add(dllDir);
                             }
                         }
                         break;
+                        
+                    case DllImportSearchPath.AssemblyDirectory:
+                        // AssemblyDirectory: 程序集所在目录（与 ApplicationDirectory 类似但更精确）
+                        if (!string.IsNullOrEmpty(projectDir))
+                        {
+                            // 探测多个可能的输出路径
+                            var assemblyPaths = GetPossibleOutputPaths(projectDir);
+                            foreach (var dllDir in assemblyPaths)
+                            {
+                                if (Directory.Exists(dllDir))
+                                    paths.Add(dllDir);
+                            }
+                            
+                            // 同时添加代码文件所在目录（某些场景下 DLL 可能与源文件同目录）
+                            if (!string.IsNullOrEmpty(codeFilePath))
+                            {
+                                var sourceDir = Path.GetDirectoryName(codeFilePath);
+                                if (Directory.Exists(sourceDir))
+                                    paths.Add(sourceDir);
+                            }
+                        }
+                        break;
+                        
                     case DllImportSearchPath.System32:
                         paths.Add(Environment.GetFolderPath(Environment.SpecialFolder.System));
                         break;
+                        
                     case DllImportSearchPath.UserDirectories:
                         paths.Add(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile));
+                        break;
+                        
+                    case DllImportSearchPath.SafeDirectories:
+                        // SafeDirectories: System32 + SysWow64
+                        paths.Add(Environment.GetFolderPath(Environment.SpecialFolder.System));
+                        string sysWow64 = Environment.GetFolderPath(Environment.SpecialFolder.SystemX86);
+                        if (!string.IsNullOrEmpty(sysWow64) && Directory.Exists(sysWow64))
+                            paths.Add(sysWow64);
+                        break;
+                        
+                    case DllImportSearchPath.UseDllDirectoryForDependencies:
+                        // UseDllDirectoryForDependencies: 使用 SetDllDirectory 设置的目录
+                        // 这通常在运行时动态设置，分析时使用项目输出目录作为近似
+                        if (!string.IsNullOrEmpty(projectDir))
+                        {
+                            var dllDirPaths = GetPossibleOutputPaths(projectDir);
+                            foreach (var dllDir in dllDirPaths)
+                            {
+                                if (Directory.Exists(dllDir))
+                                    paths.Add(dllDir);
+                            }
+                        }
+                        break;
+                        
+                    case DllImportSearchPath.LegacyBehavior:
+                        // LegacyBehavior: 传统搜索顺序（应用目录 -> 当前目录 -> System32 -> Windows -> PATH）
+                        if (!string.IsNullOrEmpty(projectDir))
+                        {
+                            var legacyPaths = GetPossibleOutputPaths(projectDir);
+                            foreach (var legacyPath in legacyPaths)
+                            {
+                                if (Directory.Exists(legacyPath))
+                                    paths.Add(legacyPath);
+                            }
+                        }
+                        paths.Add(Environment.GetFolderPath(Environment.SpecialFolder.System));
+                        paths.Add(Environment.GetFolderPath(Environment.SpecialFolder.Windows));
                         break;
                 }
             }
@@ -640,17 +723,44 @@ public class LenovoQiraCodeAnalyzerAnalyzer : DiagnosticAnalyzer
     }
 
     /// <summary>
+    /// 规范化 DLL 名称：如果没有 .dll 后缀则自动添加
+    /// Windows 的 DllImport 会自动为无后缀的名称添加 .dll
+    /// </summary>
+    private string NormalizeDllName(string dllName)
+    {
+        if (string.IsNullOrEmpty(dllName))
+            return dllName;
+
+        var ext = Path.GetExtension(dllName);
+        
+        // 如果没有扩展名，或扩展名不是常见的可执行文件扩展名，则添加 .dll
+        if (string.IsNullOrEmpty(ext) ||
+            (!ext.Equals(".dll", StringComparison.OrdinalIgnoreCase) &&
+             !ext.Equals(".exe", StringComparison.OrdinalIgnoreCase) &&
+             !ext.Equals(".so", StringComparison.OrdinalIgnoreCase) &&
+             !ext.Equals(".dylib", StringComparison.OrdinalIgnoreCase)))
+        {
+            return dllName + ".dll";
+        }
+        
+        return dllName;
+    }
+
+    /// <summary>
     /// 严格模式查找 DLL：只在指定路径中查找，不回退到系统目录
     /// </summary>
     private string FindDllPathStrict(string dllName, string searchPath)
     {
         if (string.IsNullOrEmpty(dllName)) return null;
 
+        // 规范化 DLL 名称：如果没有 .dll 后缀则添加
+        string normalizedDllName = NormalizeDllName(dllName);
+
         // 如果没有指定搜索路径，使用默认行为（系统目录）
         if (string.IsNullOrEmpty(searchPath))
         {
             string systemPath = Environment.GetFolderPath(Environment.SpecialFolder.System);
-            string systemDllPath = Path.Combine(systemPath, dllName);
+            string systemDllPath = Path.Combine(systemPath, normalizedDllName);
             if (File.Exists(systemDllPath)) return systemDllPath;
             return null;
         }
@@ -659,9 +769,13 @@ public class LenovoQiraCodeAnalyzerAnalyzer : DiagnosticAnalyzer
         foreach (var path in searchPath.Split(';'))
         {
             if (string.IsNullOrEmpty(path) || !Directory.Exists(path)) continue;
-            string fullPath = Path.Combine(path, dllName);
+            
+            // 尝试规范化后的名称
+            string fullPath = Path.Combine(path, normalizedDllName);
             if (File.Exists(fullPath)) return fullPath;
-            string archDllPath = Path.Combine(path, $"{Path.GetFileNameWithoutExtension(dllName)}.x64{Path.GetExtension(dllName)}");
+            
+            // 尝试架构特定的 DLL（如 .x64.dll）
+            string archDllPath = Path.Combine(path, $"{Path.GetFileNameWithoutExtension(normalizedDllName)}.x64{Path.GetExtension(normalizedDllName)}");
             if (File.Exists(archDllPath)) return archDllPath;
         }
 
@@ -673,19 +787,25 @@ public class LenovoQiraCodeAnalyzerAnalyzer : DiagnosticAnalyzer
     {
         if (string.IsNullOrEmpty(dllName)) return null;
 
+        // 规范化 DLL 名称：如果没有 .dll 后缀则添加
+        string normalizedDllName = NormalizeDllName(dllName);
+
         if (!string.IsNullOrEmpty(searchPath))
         {
             foreach (var path in searchPath.Split(';'))
             {
                 if (string.IsNullOrEmpty(path) || !Directory.Exists(path)) continue;
-                string fullPath = Path.Combine(path, dllName);
+                
+                string fullPath = Path.Combine(path, normalizedDllName);
                 if (File.Exists(fullPath)) return fullPath;
-                string archDllPath = Path.Combine(path, $"{Path.GetFileNameWithoutExtension(dllName)}.x64{Path.GetExtension(dllName)}");
+                
+                string archDllPath = Path.Combine(path, $"{Path.GetFileNameWithoutExtension(normalizedDllName)}.x64{Path.GetExtension(normalizedDllName)}");
                 if (File.Exists(archDllPath)) return archDllPath;
             }
         }
+        
         string systemPath = Environment.GetFolderPath(Environment.SpecialFolder.System);
-        string systemDllPath = Path.Combine(systemPath, dllName);
+        string systemDllPath = Path.Combine(systemPath, normalizedDllName);
         if (File.Exists(systemDllPath)) return systemDllPath;
 
         return null;
@@ -693,11 +813,264 @@ public class LenovoQiraCodeAnalyzerAnalyzer : DiagnosticAnalyzer
 
     private string GetDllNameFromAttribute(AttributeSyntax dllImportAttr)
     {
-        if (dllImportAttr.ArgumentList?.Arguments.FirstOrDefault()?.Expression is LiteralExpressionSyntax literal)
+        var firstArg = dllImportAttr.ArgumentList?.Arguments.FirstOrDefault()?.Expression;
+        if (firstArg == null)
+            return null;
+
+        return ExtractStringValueFromExpression(firstArg, null);
+    }
+
+    /// <summary>
+    /// 从 DllImport 属性中提取 DLL 名称，支持语义分析解析常量值
+    /// </summary>
+    private string GetDllNameFromAttribute(AttributeSyntax dllImportAttr, SyntaxNodeAnalysisContext context)
+    {
+        var firstArg = dllImportAttr.ArgumentList?.Arguments.FirstOrDefault()?.Expression;
+        if (firstArg == null)
+            return null;
+
+        return ExtractStringValueFromExpression(firstArg, context.SemanticModel);
+    }
+
+    /// <summary>
+    /// 从表达式中提取字符串值，支持多种表达式类型
+    /// </summary>
+    private string ExtractStringValueFromExpression(ExpressionSyntax expression, SemanticModel semanticModel)
+    {
+        if (expression == null)
+            return null;
+
+        // 情况1: 直接的字符串字面量
+        if (expression is LiteralExpressionSyntax literal && 
+            literal.IsKind(SyntaxKind.StringLiteralExpression))
         {
             return literal.Token.Value?.ToString();
         }
+
+        // 情况2: 标识符引用（常量或字段）
+        if (expression is IdentifierNameSyntax identifier)
+        {
+            return ResolveIdentifierValue(identifier, semanticModel);
+        }
+
+        // 情况3: 成员访问表达式（如 Constants.DllName）
+        if (expression is MemberAccessExpressionSyntax memberAccess)
+        {
+            return ResolveMemberAccessValue(memberAccess, semanticModel);
+        }
+
+        // 情况4: 字符串连接表达式
+        if (expression is BinaryExpressionSyntax binary && 
+            binary.OperatorToken.IsKind(SyntaxKind.PlusToken))
+        {
+            var leftValue = ExtractStringValueFromExpression(binary.Left, semanticModel);
+            var rightValue = ExtractStringValueFromExpression(binary.Right, semanticModel);
+            
+            if (leftValue != null && rightValue != null)
+                return leftValue + rightValue;
+            
+            // 如果只有一边解析成功，返回部分结果
+            if (leftValue != null)
+                return leftValue;
+            if (rightValue != null)
+                return rightValue;
+            
+            return null;
+        }
+
+        // 情况5: 插值字符串 $"..."
+        if (expression is InterpolatedStringExpressionSyntax interpolated)
+        {
+            return ExtractInterpolatedString(interpolated, semanticModel);
+        }
+
+        // 情况6: 尝试使用语义模型获取常量值
+        if (semanticModel != null)
+        {
+            try
+            {
+                var constantValue = semanticModel.GetConstantValue(expression);
+                if (constantValue.HasValue && constantValue.Value is string strValue)
+                {
+                    return strValue;
+                }
+            }
+            catch
+            {
+                // 语义分析失败，忽略
+            }
+        }
+
         return null;
+    }
+
+    /// <summary>
+    /// 解析标识符引用的值（常量字段）
+    /// </summary>
+    private string ResolveIdentifierValue(IdentifierNameSyntax identifier, SemanticModel semanticModel)
+    {
+        // 优先使用语义分析
+        if (semanticModel != null)
+        {
+            try
+            {
+                var symbol = semanticModel.GetSymbolInfo(identifier).Symbol;
+                if (symbol is IFieldSymbol fieldSymbol && fieldSymbol.HasConstantValue)
+                {
+                    return fieldSymbol.ConstantValue?.ToString();
+                }
+                
+                // 尝试获取编译时常量值
+                var constantValue = semanticModel.GetConstantValue(identifier);
+                if (constantValue.HasValue && constantValue.Value is string strValue)
+                {
+                    return strValue;
+                }
+            }
+            catch
+            {
+                // 语义分析失败，回退到语法分析
+            }
+        }
+
+        // 回退：在语法树中查找常量定义
+        var identifierName = identifier.Identifier.Text;
+        var containingClass = identifier.FirstAncestorOrSelf<ClassDeclarationSyntax>();
+        
+        if (containingClass != null)
+        {
+            var constField = FindConstantFieldValue(containingClass, identifierName);
+            if (constField != null)
+                return constField;
+        }
+
+        return null;
+    }
+
+    /// <summary>
+    /// 解析成员访问表达式的值（如 Constants.DllName）
+    /// </summary>
+    private string ResolveMemberAccessValue(MemberAccessExpressionSyntax memberAccess, SemanticModel semanticModel)
+    {
+        // 优先使用语义分析
+        if (semanticModel != null)
+        {
+            try
+            {
+                var symbol = semanticModel.GetSymbolInfo(memberAccess).Symbol;
+                if (symbol is IFieldSymbol fieldSymbol && fieldSymbol.HasConstantValue)
+                {
+                    return fieldSymbol.ConstantValue?.ToString();
+                }
+                
+                var constantValue = semanticModel.GetConstantValue(memberAccess);
+                if (constantValue.HasValue && constantValue.Value is string strValue)
+                {
+                    return strValue;
+                }
+            }
+            catch
+            {
+                // 语义分析失败，回退到语法分析
+            }
+        }
+
+        // 回退：尝试在当前编译单元中查找成员定义
+        var memberName = memberAccess.Name.Identifier.Text;
+        
+        // 获取类型名（可能是简单名称或完全限定名）
+        string typeName = null;
+        if (memberAccess.Expression is IdentifierNameSyntax typeId)
+        {
+            typeName = typeId.Identifier.Text;
+        }
+        else if (memberAccess.Expression is MemberAccessExpressionSyntax nestedAccess)
+        {
+            typeName = nestedAccess.Name.Identifier.Text;
+        }
+
+        if (typeName != null)
+        {
+            // 在语法树中查找类型定义
+            var root = memberAccess.SyntaxTree.GetRoot();
+            var targetClass = root.DescendantNodes()
+                .OfType<ClassDeclarationSyntax>()
+                .FirstOrDefault(c => c.Identifier.Text == typeName);
+
+            if (targetClass != null)
+            {
+                var constValue = FindConstantFieldValue(targetClass, memberName);
+                if (constValue != null)
+                    return constValue;
+            }
+        }
+
+        return null;
+    }
+
+    /// <summary>
+    /// 在类中查找常量字段的值
+    /// </summary>
+    private string FindConstantFieldValue(ClassDeclarationSyntax classDecl, string fieldName)
+    {
+        foreach (var member in classDecl.Members)
+        {
+            if (member is FieldDeclarationSyntax fieldDecl)
+            {
+                // 检查是否是 const 或 static readonly
+                bool isConst = fieldDecl.Modifiers.Any(m => m.IsKind(SyntaxKind.ConstKeyword));
+                bool isStaticReadonly = fieldDecl.Modifiers.Any(m => m.IsKind(SyntaxKind.StaticKeyword)) &&
+                                        fieldDecl.Modifiers.Any(m => m.IsKind(SyntaxKind.ReadOnlyKeyword));
+
+                if (isConst || isStaticReadonly)
+                {
+                    foreach (var variable in fieldDecl.Declaration.Variables)
+                    {
+                        if (variable.Identifier.Text == fieldName)
+                        {
+                            if (variable.Initializer?.Value is LiteralExpressionSyntax literalInit &&
+                                literalInit.IsKind(SyntaxKind.StringLiteralExpression))
+                            {
+                                return literalInit.Token.Value?.ToString();
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        return null;
+    }
+
+    /// <summary>
+    /// 提取插值字符串的静态部分
+    /// </summary>
+    private string ExtractInterpolatedString(InterpolatedStringExpressionSyntax interpolated, SemanticModel semanticModel)
+    {
+        var builder = new System.Text.StringBuilder();
+        bool allResolved = true;
+
+        foreach (var content in interpolated.Contents)
+        {
+            if (content is InterpolatedStringTextSyntax text)
+            {
+                builder.Append(text.TextToken.ValueText);
+            }
+            else if (content is InterpolationSyntax interp)
+            {
+                var interpValue = ExtractStringValueFromExpression(interp.Expression, semanticModel);
+                if (interpValue != null)
+                {
+                    builder.Append(interpValue);
+                }
+                else
+                {
+                    allResolved = false;
+                    break;
+                }
+            }
+        }
+
+        return allResolved ? builder.ToString() : null;
     }
 
     private void AnalyzeCatchClauseForStackTrace(SyntaxNodeAnalysisContext context)
@@ -752,16 +1125,23 @@ public class LenovoQiraCodeAnalyzerAnalyzer : DiagnosticAnalyzer
         if (context.CancellationToken.IsCancellationRequested) return;
 
         var root = context.Tree.GetRoot();
-        var allTrivias = root.DescendantTrivia(descendIntoTrivia: true).ToList();
         var processedSpans = new HashSet<int>();
-
-        for (int i = 0; i < allTrivias.Count; i++)
+        
+        // 收集所有单行注释用于连续性检测（只收集单行注释，不收集所有 trivia）
+        var singleLineComments = new List<SyntaxTrivia>();
+        
+        // 使用延迟枚举遍历，不一次性加载所有 trivia
+        foreach (var trivia in root.DescendantTrivia(descendIntoTrivia: true))
         {
-            var trivia = allTrivias[i];
-
-            // 跳过已处理的trivia
-            if (processedSpans.Contains(trivia.Span.Start))
+            // 支持取消操作
+            if (context.CancellationToken.IsCancellationRequested) return;
+            
+            // 收集单行注释用于后续连续性分析
+            if (trivia.IsKind(SyntaxKind.SingleLineCommentTrivia))
+            {
+                singleLineComments.Add(trivia);
                 continue;
+            }
 
             string rawText = trivia.ToString().Trim();
             if (string.IsNullOrWhiteSpace(rawText)) continue;
@@ -770,86 +1150,81 @@ public class LenovoQiraCodeAnalyzerAnalyzer : DiagnosticAnalyzer
             if (trivia.IsKind(SyntaxKind.MultiLineCommentTrivia))
             {
                 string commentText = ExtractCommentText(rawText, trivia.Kind());
-                // 块注释按1行处理，主要检查长度
                 if (IsLargeCodeBlock(commentText, 1))
                 {
                     var location = Location.Create(context.Tree, trivia.Span);
                     Report(context.ReportDiagnostic, CODE001Id, "CodeStyle", DiagnosticSeverity.Warning, location,
                         TruncateLongText(commentText, 50));
                 }
-                processedSpans.Add(trivia.Span.Start);
+            }
+        }
+
+        // 处理单行注释（分析连续性）
+        if (singleLineComments.Count > 0)
+        {
+            AnalyzeConsecutiveSingleLineComments(context, singleLineComments, processedSpans);
+        }
+    }
+
+    /// <summary>
+    /// 分析连续的单行注释块
+    /// </summary>
+    private void AnalyzeConsecutiveSingleLineComments(
+        SyntaxTreeAnalysisContext context, 
+        List<SyntaxTrivia> singleLineComments, 
+        HashSet<int> processedSpans)
+    {
+        for (int i = 0; i < singleLineComments.Count; i++)
+        {
+            if (context.CancellationToken.IsCancellationRequested) return;
+            
+            var trivia = singleLineComments[i];
+
+            if (processedSpans.Contains(trivia.Span.Start))
                 continue;
+
+            // 收集连续的单行注释
+            var commentGroup = new List<SyntaxTrivia> { trivia };
+            processedSpans.Add(trivia.Span.Start);
+
+            int currentLine = trivia.GetLocation().GetLineSpan().StartLinePosition.Line;
+
+            // 向后查找连续的单行注释
+            for (int j = i + 1; j < singleLineComments.Count; j++)
+            {
+                var nextTrivia = singleLineComments[j];
+
+                if (processedSpans.Contains(nextTrivia.Span.Start))
+                    continue;
+
+                int nextLine = nextTrivia.GetLocation().GetLineSpan().StartLinePosition.Line;
+
+                // 只有行号连续（相差1）才算连续注释
+                if (nextLine == currentLine + 1)
+                {
+                    commentGroup.Add(nextTrivia);
+                    processedSpans.Add(nextTrivia.Span.Start);
+                    currentLine = nextLine;
+                }
+                else if (nextLine > currentLine + 1)
+                {
+                    // 行号不连续，断开
+                    break;
+                }
+                // 如果 nextLine <= currentLine，说明 trivia 不是按行号排序的，跳过
             }
 
-            // 跳过文档注释
-            if (trivia.IsKind(SyntaxKind.DocumentationCommentExteriorTrivia))
+            // 合并注释文本
+            var combinedText = string.Join("\n", commentGroup.Select(t =>
+                ExtractCommentText(t.ToString().Trim(), SyntaxKind.SingleLineCommentTrivia)));
+
+            if (IsLargeCodeBlock(combinedText, commentGroup.Count))
             {
-                processedSpans.Add(trivia.Span.Start);
-                continue;
-            }
-
-            // 处理单行注释 // 以及连续的多行注释块
-            if (trivia.IsKind(SyntaxKind.SingleLineCommentTrivia))
-            {
-                // 收集连续的单行注释
-                var commentGroup = new List<SyntaxTrivia> { trivia };
-                processedSpans.Add(trivia.Span.Start);
-
-                // 获取当前注释的行号
-                int currentLine = trivia.GetLocation().GetLineSpan().StartLinePosition.Line;
-
-                // 向后查找连续的单行注释（按行号判断连续性）
-                int j = i + 1;
-                while (j < allTrivias.Count)
-                {
-                    var nextTrivia = allTrivias[j];
-
-                    // 跳过空白和换行
-                    if (nextTrivia.IsKind(SyntaxKind.EndOfLineTrivia) ||
-                        nextTrivia.IsKind(SyntaxKind.WhitespaceTrivia))
-                    {
-                        j++;
-                        continue;
-                    }
-
-                    // 如果是另一个单行注释，检查行号是否连续
-                    if (nextTrivia.IsKind(SyntaxKind.SingleLineCommentTrivia) &&
-                        !processedSpans.Contains(nextTrivia.Span.Start))
-                    {
-                        int nextLine = nextTrivia.GetLocation().GetLineSpan().StartLinePosition.Line;
-
-                        // 只有行号连续（相差1）才算连续注释
-                        if (nextLine == currentLine + 1)
-                        {
-                            commentGroup.Add(nextTrivia);
-                            processedSpans.Add(nextTrivia.Span.Start);
-                            currentLine = nextLine;
-                            j++;
-                        }
-                        else
-                        {
-                            // 行号不连续，断开
-                            break;
-                        }
-                    }
-                    else
-                    {
-                        break;
-                    }
-                }
-
-                // 合并注释文本
-                var combinedText = string.Join("\n", commentGroup.Select(t =>
-                    ExtractCommentText(t.ToString().Trim(), SyntaxKind.SingleLineCommentTrivia)));
-
-                if (IsLargeCodeBlock(combinedText, commentGroup.Count))
-                {
-                    var spanStart = commentGroup.First().Span.Start;
-                    var spanEnd = commentGroup.Last().Span.End;
-                    var location = Location.Create(context.Tree, new TextSpan(spanStart, spanEnd - spanStart));
-                    Report(context.ReportDiagnostic, CODE001Id, "CodeStyle", DiagnosticSeverity.Warning, location,
-                        TruncateLongText(combinedText, 50));
-                }
+                var spanStart = commentGroup.First().Span.Start;
+                var spanEnd = commentGroup.Last().Span.End;
+                var location = Location.Create(context.Tree, new TextSpan(spanStart, spanEnd - spanStart));
+                Report(context.ReportDiagnostic, CODE001Id, "CodeStyle", DiagnosticSeverity.Warning, location,
+                    TruncateLongText(combinedText, 50));
             }
         }
     }

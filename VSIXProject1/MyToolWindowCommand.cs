@@ -612,79 +612,72 @@ namespace VSIXProject1
             }
 
             // 现在我们有了一个纯字符串列表，安全切换到真正的后台线程执行繁重的分析任务
-            return await Task.Run(() =>
+            int totalFiles = filesToAnalyze.Count;
+            
+            if (totalFiles == 0) return diagnostics;
+            
+            progress?.Report(new AnalysisProgress { CompletedFiles = 0, TotalFiles = totalFiles, CurrentFile = "准备分析..." });
+
+            int completedFiles = 0;
+            var progressLock = new object();
+            
+            // 限制并发度，避免线程池饱和
+            int maxConcurrency = Math.Max(1, Environment.ProcessorCount / 2);
+            using (var semaphore = new SemaphoreSlim(maxConcurrency))
             {
-                int completedFiles = 0;
-                int totalFiles = filesToAnalyze.Count;
-                
-                if (totalFiles == 0) return diagnostics;
-                
-                progress?.Report(new AnalysisProgress { CompletedFiles = 0, TotalFiles = totalFiles, CurrentFile = "准备分析..." });
-
-                var options = new ParallelOptions
+                var tasks = filesToAnalyze.Select(async (file, index) =>
                 {
-                    MaxDegreeOfParallelism = Math.Max(1, Environment.ProcessorCount / 2),
-                    CancellationToken = cancellationToken
-                };
-
-                var fileDiagnosticsList = new List<Diagnostic>[totalFiles];
-                var progressLock = new object();
-
-                var tasks = new Task[totalFiles];
-                Parallel.For(0, totalFiles, options, i =>
-                {
-                    int index = i; // capture loop variable
-                    tasks[index] = Task.Run(async () =>
+                    await semaphore.WaitAsync(cancellationToken);
+                    try
                     {
-                        try
-                        {
-                            cancellationToken.ThrowIfCancellationRequested();
+                        cancellationToken.ThrowIfCancellationRequested();
 
-                            lock (progressLock)
+                        lock (progressLock)
+                        {
+                            progress?.Report(new AnalysisProgress
                             {
-                                progress?.Report(new AnalysisProgress
-                                {
-                                    CompletedFiles = completedFiles,
-                                    TotalFiles = totalFiles,
-                                    CurrentFile = filesToAnalyze[index]
-                                });
-                            }
-
-                            var fileDiagnostics = await AnalyzeFileAsync(filesToAnalyze[index], cancellationToken);
-                            fileDiagnosticsList[index] = fileDiagnostics.ToList();
-
-                            Interlocked.Increment(ref completedFiles);
+                                CompletedFiles = completedFiles,
+                                TotalFiles = totalFiles,
+                                CurrentFile = file
+                            });
                         }
-                        catch (OperationCanceledException)
-                        {
-                            throw;
-                        }
-                        catch (Exception ex)
-                        {
-                            Debug.WriteLine($"分析文件失败 {filesToAnalyze[index]}: {ex.Message}");
-                            fileDiagnosticsList[index] = new List<Diagnostic>();
-                            Interlocked.Increment(ref completedFiles);
-                        }
-                    }, cancellationToken);
-                });
-                
-                // Wait for all async file analysis tasks to complete
-                Task.WaitAll(tasks);
 
-                foreach (var fileDiagnostics in fileDiagnosticsList)
+                        var fileDiagnostics = await AnalyzeFileAsync(file, cancellationToken);
+                        Interlocked.Increment(ref completedFiles);
+                        return fileDiagnostics.ToList();
+                    }
+                    catch (OperationCanceledException)
+                    {
+                        throw;
+                    }
+                    catch (Exception ex)
+                    {
+                        Debug.WriteLine($"分析文件失败 {file}: {ex.Message}");
+                        Interlocked.Increment(ref completedFiles);
+                        return new List<Diagnostic>();
+                    }
+                    finally
+                    {
+                        semaphore.Release();
+                    }
+                }).ToList();
+
+                var results = await Task.WhenAll(tasks);
+
+                foreach (var fileDiagnostics in results)
                 {
                     if (fileDiagnostics != null)
                     {
                         diagnostics.AddRange(fileDiagnostics);
                     }
                 }
+            }
 
-                progress?.Report(new AnalysisProgress { CompletedFiles = totalFiles, TotalFiles = totalFiles, CurrentFile = "分析完成", IsCompleted = true });
+            progress?.Report(new AnalysisProgress { CompletedFiles = totalFiles, TotalFiles = totalFiles, CurrentFile = "分析完成", IsCompleted = true });
 
-                var uniqueDiagnostics = diagnostics.Distinct(new DiagnosticEqualityComparer()).ToList();
+            var uniqueDiagnostics = diagnostics.Distinct(new DiagnosticEqualityComparer()).ToList();
 
-                return uniqueDiagnostics;
-            }, cancellationToken);
+            return uniqueDiagnostics;
         }
 
 

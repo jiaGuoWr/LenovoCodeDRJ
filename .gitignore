@@ -35,3 +35,6 @@ Thumbs.db
 ## 临时文件
 *.tmp
 *.temp
+/LenovoAnalyzer.Tests/Infrastructure/*.cs
+/LenovoAnalyzer.Tests/*.csproj
+/LenovoAnalyzer.Tests/Rules/*.cs

@@ -319,15 +319,15 @@ public class LenovoQiraCodeAnalyzerAnalyzer : DiagnosticAnalyzer
         context.RegisterSyntaxNodeAction(AnalyzeUnsafeReflection, SyntaxKind.InvocationExpression);
 
         // SEC010: 竞争条件
-        context.RegisterSyntaxNodeAction(AnalyzeRaceConditionIncrement, SyntaxKind.PostIncrementExpression);
-        context.RegisterSyntaxNodeAction(AnalyzeRaceConditionIncrement, SyntaxKind.PreIncrementExpression);
-        context.RegisterSyntaxNodeAction(AnalyzeRaceConditionDecrement, SyntaxKind.PostDecrementExpression);
-        context.RegisterSyntaxNodeAction(AnalyzeRaceConditionDecrement, SyntaxKind.PreDecrementExpression);
-        context.RegisterSyntaxNodeAction(AnalyzeRaceConditionCompoundAssignment, SyntaxKind.AddAssignmentExpression);
-        context.RegisterSyntaxNodeAction(AnalyzeRaceConditionCompoundAssignment, SyntaxKind.SubtractAssignmentExpression);
-        context.RegisterSyntaxNodeAction(AnalyzeRaceConditionCheckThenUse, SyntaxKind.IfStatement);
-        context.RegisterSyntaxNodeAction(AnalyzeNonThreadSafeCollection, SyntaxKind.InvocationExpression);
-        context.RegisterSyntaxNodeAction(AnalyzeNonThreadSafeCollectionIndexer, SyntaxKind.SimpleAssignmentExpression);
+        //context.RegisterSyntaxNodeAction(AnalyzeRaceConditionIncrement, SyntaxKind.PostIncrementExpression);
+        //context.RegisterSyntaxNodeAction(AnalyzeRaceConditionIncrement, SyntaxKind.PreIncrementExpression);
+        //context.RegisterSyntaxNodeAction(AnalyzeRaceConditionDecrement, SyntaxKind.PostDecrementExpression);
+        //context.RegisterSyntaxNodeAction(AnalyzeRaceConditionDecrement, SyntaxKind.PreDecrementExpression);
+        //context.RegisterSyntaxNodeAction(AnalyzeRaceConditionCompoundAssignment, SyntaxKind.AddAssignmentExpression);
+        //context.RegisterSyntaxNodeAction(AnalyzeRaceConditionCompoundAssignment, SyntaxKind.SubtractAssignmentExpression);
+        //context.RegisterSyntaxNodeAction(AnalyzeRaceConditionCheckThenUse, SyntaxKind.IfStatement);
+        //context.RegisterSyntaxNodeAction(AnalyzeNonThreadSafeCollection, SyntaxKind.InvocationExpression);
+        //context.RegisterSyntaxNodeAction(AnalyzeNonThreadSafeCollectionIndexer, SyntaxKind.SimpleAssignmentExpression);
 
         // SEC011: 不安全IPC
         context.RegisterSyntaxNodeAction(AnalyzeInsecureBinding, SyntaxKind.ObjectCreationExpression);
@@ -1315,8 +1315,6 @@ public class LenovoQiraCodeAnalyzerAnalyzer : DiagnosticAnalyzer
     // 路径遍历检测相关关键字
     private static readonly HashSet<string> PathTraversalKeywords = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
     {
-        "input", "userinput", "request", "query", "param", "parameter",
-        "arg", "argument", "data", "content", "text", "value",
         "path", "filepath", "filename", "file", "url", "uri"
     };
 
@@ -1341,6 +1339,14 @@ public class LenovoQiraCodeAnalyzerAnalyzer : DiagnosticAnalyzer
         {
             if (IsSuspiciousPathArgument(arg.Expression))
             {
+                // 检查结果变量是否在后续被验证
+                var targetVariable = GetAssignmentTargetVariable(invocation);
+                if (!string.IsNullOrEmpty(targetVariable) &&
+                    IsVariableValidatedInMethod(targetVariable, invocation, invocation.SpanStart))
+                {
+                    return; // 已验证，豁免警告
+                }
+
                 Report(context.ReportDiagnostic, SEC002Id, "Security", DiagnosticSeverity.Warning, arg.GetLocation(),
                     new LocalizableArgument("SEC002_Arg_Method", methodName));
                 return;
@@ -1365,6 +1371,14 @@ public class LenovoQiraCodeAnalyzerAnalyzer : DiagnosticAnalyzer
             // 检查另一侧是否包含可疑输入
             if (IsSuspiciousPathArgument(binaryExpr.Left) || IsSuspiciousPathArgument(binaryExpr.Right))
             {
+                // 检查结果变量是否在后续被验证
+                var targetVariable = GetAssignmentTargetVariable(binaryExpr);
+                if (!string.IsNullOrEmpty(targetVariable) &&
+                    IsVariableValidatedInMethod(targetVariable, binaryExpr, binaryExpr.SpanStart))
+                {
+                    return; // 已验证，豁免警告
+                }
+
                 Report(context.ReportDiagnostic, SEC002Id, "Security", DiagnosticSeverity.Warning, binaryExpr.GetLocation(),
                     new LocalizableArgument("SEC002_Arg_Concat"));
             }
@@ -1390,6 +1404,14 @@ public class LenovoQiraCodeAnalyzerAnalyzer : DiagnosticAnalyzer
             if (content is InterpolationSyntax interp &&
                 IsSuspiciousPathArgument(interp.Expression))
             {
+                // 检查结果变量是否在后续被验证
+                var targetVariable = GetAssignmentTargetVariable(interpolation);
+                if (!string.IsNullOrEmpty(targetVariable) &&
+                    IsVariableValidatedInMethod(targetVariable, interpolation, interpolation.SpanStart))
+                {
+                    return; // 已验证，豁免警告
+                }
+
                 Report(context.ReportDiagnostic, SEC002Id, "Security", DiagnosticSeverity.Warning, interp.GetLocation(),
                     new LocalizableArgument("SEC002_Arg_Interpolation"));
                 return;
@@ -1499,6 +1521,156 @@ public class LenovoQiraCodeAnalyzerAnalyzer : DiagnosticAnalyzer
             {
                 return true;
             }
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// 从表达式所在的赋值语句中提取目标变量名
+    /// 支持: var x = expr; string x = expr; x = expr;
+    /// </summary>
+    private string GetAssignmentTargetVariable(SyntaxNode node)
+    {
+        var parent = node.Parent;
+        while (parent != null)
+        {
+            // var x = expr; 或 string x = expr;
+            if (parent is EqualsValueClauseSyntax equalsClause &&
+                equalsClause.Parent is VariableDeclaratorSyntax declarator)
+            {
+                return declarator.Identifier.Text;
+            }
+
+            // x = expr;
+            if (parent is AssignmentExpressionSyntax assignment &&
+                assignment.Left is IdentifierNameSyntax identifier)
+            {
+                return identifier.Identifier.Text;
+            }
+
+            // 避免无限循环，只向上遍历有限层级
+            if (parent is StatementSyntax)
+                break;
+
+            parent = parent.Parent;
+        }
+        return null;
+    }
+
+    /// <summary>
+    /// 检测变量是否在方法体内被验证（在指定位置之后）
+    /// 验证模式包括：StartsWith、Contains("..")、Path.GetFullPath 后跟验证
+    /// </summary>
+    private bool IsVariableValidatedInMethod(string variableName, SyntaxNode containingNode, int afterPosition)
+    {
+        if (string.IsNullOrEmpty(variableName))
+            return false;
+
+        // 找到包含该节点的方法体
+        var methodBody = containingNode.FirstAncestorOrSelf<BlockSyntax>();
+        if (methodBody == null)
+            return false;
+
+        // 收集需要追踪的变量名（包括赋值传递的变量）
+        var trackedVariables = new HashSet<string>(StringComparer.Ordinal) { variableName };
+        CollectAssignedVariables(methodBody, variableName, trackedVariables, afterPosition);
+
+        // 在方法体中查找验证模式
+        foreach (var invocation in methodBody.DescendantNodes().OfType<InvocationExpressionSyntax>())
+        {
+            // 只检查在问题位置之后的代码
+            if (invocation.SpanStart <= afterPosition)
+                continue;
+
+            if (IsValidationCall(invocation, trackedVariables))
+                return true;
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// 收集从源变量赋值传递的其他变量
+    /// 例如: var normalized = Path.GetFullPath(original); 则 normalized 也需要追踪
+    /// </summary>
+    private void CollectAssignedVariables(BlockSyntax methodBody, string sourceVariable, HashSet<string> trackedVariables, int afterPosition)
+    {
+        foreach (var declaration in methodBody.DescendantNodes().OfType<VariableDeclaratorSyntax>())
+        {
+            if (declaration.SpanStart <= afterPosition)
+                continue;
+
+            var initializer = declaration.Initializer?.Value;
+            if (initializer == null)
+                continue;
+
+            // 检查初始化表达式是否引用了被追踪的变量
+            var initText = initializer.ToString();
+            if (trackedVariables.Any(v => initText.Contains(v)))
+            {
+                trackedVariables.Add(declaration.Identifier.Text);
+            }
+        }
+
+        // 同样处理赋值表达式
+        foreach (var assignment in methodBody.DescendantNodes().OfType<AssignmentExpressionSyntax>())
+        {
+            if (assignment.SpanStart <= afterPosition)
+                continue;
+
+            if (assignment.Left is IdentifierNameSyntax identifier)
+            {
+                var rightText = assignment.Right.ToString();
+                if (trackedVariables.Any(v => rightText.Contains(v)))
+                {
+                    trackedVariables.Add(identifier.Identifier.Text);
+                }
+            }
+        }
+    }
+
+    /// <summary>
+    /// 判断方法调用是否是路径验证调用
+    /// </summary>
+    private bool IsValidationCall(InvocationExpressionSyntax invocation, HashSet<string> trackedVariables)
+    {
+        var invocText = invocation.ToString();
+
+        // 模式 1: variable.StartsWith(...)
+        if (invocation.Expression is MemberAccessExpressionSyntax memberAccess)
+        {
+            var methodName = memberAccess.Name.Identifier.Text;
+            var targetText = memberAccess.Expression.ToString();
+
+            // 检查是否是被追踪变量的 StartsWith 调用
+            if (methodName.Equals("StartsWith", StringComparison.OrdinalIgnoreCase) &&
+                trackedVariables.Any(v => targetText.Contains(v)))
+            {
+                return true;
+            }
+
+            // 模式 2: variable.Contains("..") 或类似的遍历检查
+            if (methodName.Equals("Contains", StringComparison.OrdinalIgnoreCase) &&
+                trackedVariables.Any(v => targetText.Contains(v)))
+            {
+                // 检查参数是否包含路径遍历特征
+                var args = invocation.ArgumentList.Arguments;
+                if (args.Count > 0)
+                {
+                    var argText = args[0].ToString();
+                    if (argText.Contains("..") || argText.Contains("~") || argText.Contains("%"))
+                    {
+                        return true;
+                    }
+                }
+            }
+        }
+
+        // 模式 3: Path.GetFullPath(variable) - 路径规范化通常是验证的一部分
+        if (invocText.Contains("GetFullPath") && trackedVariables.Any(v => invocText.Contains(v)))
+        {
+            return true;
         }
 
         return false;

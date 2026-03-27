@@ -1,7 +1,7 @@
 <?xml version="1.0" ?>
 <PackageManifest Version="2.0.0" xmlns="http://schemas.microsoft.com/developer/vsx-schema/2011" xmlns:d="http://schemas.microsoft.com/developer/vsx-schema-design/2011">
     <Metadata>
-        <Identity Id="VSIXProject1.e89340e7-2602-4d3e-ae56-e08ca0ca54f8" Version="3.0.1" Language="en-US" Publisher="Lenovo Direnjie" />
+        <Identity Id="VSIXProject1.e89340e7-2602-4d3e-ae56-e08ca0ca54f8" Version="3.0.3" Language="en-US" Publisher="Lenovo Direnjie" />
         <DisplayName>Lenovo Direnjie</DisplayName>
         <Description xml:space="preserve">Lenovo A Visual Studio extension that provides Git integration and code analysis capabilities.</Description>
         <License>LICENSE.txt</License>

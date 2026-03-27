@@ -39,3 +39,5 @@ Thumbs.db
 /LenovoAnalyzer.Tests/*.csproj
 /LenovoAnalyzer.Tests/Rules/*.cs
 /README.md
+/CodeCheckRules.xlsx
+/~$CodeCheckRules.xlsx

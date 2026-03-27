@@ -1,0 +1,365 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <xsd:schema id="root" xmlns="" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:msdata="urn:schemas-microsoft-com:xml-msdata">
+    <xsd:import namespace="http://www.w3.org/XML/1998/namespace" />
+    <xsd:element name="root" msdata:IsDataSet="true">
+      <xsd:complexType>
+        <xsd:choice maxOccurs="unbounded">
+          <xsd:element name="metadata">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" />
+              </xsd:sequence>
+              <xsd:attribute name="name" use="required" type="xsd:string" />
+              <xsd:attribute name="type" type="xsd:string" />
+              <xsd:attribute name="mimetype" type="xsd:string" />
+              <xsd:attribute ref="xml:space" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="assembly">
+            <xsd:complexType>
+              <xsd:attribute name="alias" type="xsd:string" />
+              <xsd:attribute name="name" type="xsd:string" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="data">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+                <xsd:element name="comment" type="xsd:string" minOccurs="0" msdata:Ordinal="2" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" msdata:Ordinal="1" />
+              <xsd:attribute name="type" type="xsd:string" msdata:Ordinal="3" />
+              <xsd:attribute name="mimetype" type="xsd:string" msdata:Ordinal="4" />
+              <xsd:attribute ref="xml:space" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="resheader">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" />
+            </xsd:complexType>
+          </xsd:element>
+        </xsd:choice>
+      </xsd:complexType>
+    </xsd:element>
+  </xsd:schema>
+  <resheader name="resmimetype">
+    <value>text/microsoft-resx</value>
+  </resheader>
+  <resheader name="version">
+    <value>2.0</value>
+  </resheader>
+  <resheader name="reader">
+    <value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <resheader name="writer">
+    <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+
+  <!-- CHN001 -->
+  <data name="CHN001_Title" xml:space="preserve">
+    <value>Chinese in comments</value>
+  </data>
+  <data name="CHN001_MessageFormat" xml:space="preserve">
+    <value>Comment contains Chinese characters: '{0}'</value>
+  </data>
+  <data name="CHN001_Description" xml:space="preserve">
+    <value>Code comments should be in English for international team collaboration</value>
+  </data>
+
+  <!-- DLL002 -->
+  <data name="DLL002_Title" xml:space="preserve">
+    <value>Missing DllImportSearchPaths</value>
+  </data>
+  <data name="DLL002_MessageFormat" xml:space="preserve">
+    <value>DllImport missing DefaultDllImportSearchPaths attribute</value>
+  </data>
+  <data name="DLL002_Description" xml:space="preserve">
+    <value>Specify DefaultDllImportSearchPaths to prevent DLL hijacking attacks</value>
+  </data>
+
+  <!-- DLL003 -->
+  <data name="DLL003_Title" xml:space="preserve">
+    <value>Unsafe DLL signature</value>
+  </data>
+  <data name="DLL003_MessageFormat" xml:space="preserve">
+    <value>{0}</value>
+  </data>
+  <data name="DLL003_Description" xml:space="preserve">
+    <value>Referenced DLLs should have valid digital signatures</value>
+  </data>
+
+  <!-- EXC001 -->
+  <data name="EXC001_Title" xml:space="preserve">
+    <value>Stack trace in catch</value>
+  </data>
+  <data name="EXC001_MessageFormat" xml:space="preserve">
+    <value>Full stack trace should not be printed in catch block</value>
+  </data>
+  <data name="EXC001_Description" xml:space="preserve">
+    <value>Printing full stack traces may expose internal system structure</value>
+  </data>
+
+  <!-- CODE001 -->
+  <data name="CODE001_Title" xml:space="preserve">
+    <value>Code in comment</value>
+  </data>
+  <data name="CODE001_MessageFormat" xml:space="preserve">
+    <value>Comment contains code fragment: '{0}'</value>
+  </data>
+  <data name="CODE001_Description" xml:space="preserve">
+    <value>Comments should not contain commented-out code</value>
+  </data>
+
+  <!-- SEC001 -->
+  <data name="SEC001_Title" xml:space="preserve">
+    <value>Sensitive info in code</value>
+  </data>
+  <data name="SEC001_MessageFormat" xml:space="preserve">
+    <value>Variable '{0}' may contain hardcoded sensitive information</value>
+  </data>
+  <data name="SEC001_Description" xml:space="preserve">
+    <value>Sensitive information should not be hardcoded</value>
+  </data>
+
+  <!-- SEC002 -->
+  <data name="SEC002_Title" xml:space="preserve">
+    <value>Path traversal risk</value>
+  </data>
+  <data name="SEC002_MessageFormat" xml:space="preserve">
+    <value>Path traversal risk: {0}</value>
+  </data>
+  <data name="SEC002_Description" xml:space="preserve">
+    <value>Validate and normalize paths to prevent directory traversal attacks</value>
+  </data>
+
+  <!-- SEC003 -->
+  <data name="SEC003_Title" xml:space="preserve">
+    <value>SQL injection risk</value>
+  </data>
+  <data name="SEC003_MessageFormat" xml:space="preserve">
+    <value>SQL injection risk: {0}</value>
+  </data>
+  <data name="SEC003_Description" xml:space="preserve">
+    <value>Use parameterized queries to prevent SQL injection</value>
+  </data>
+
+  <!-- SEC004 -->
+  <data name="SEC004_Title" xml:space="preserve">
+    <value>Unsafe deserialization</value>
+  </data>
+  <data name="SEC004_MessageFormat" xml:space="preserve">
+    <value>Using unsafe deserializer: {0}</value>
+  </data>
+  <data name="SEC004_Description" xml:space="preserve">
+    <value>Deserializers like BinaryFormatter pose remote code execution risks</value>
+  </data>
+
+  <!-- SEC005 -->
+  <data name="SEC005_Title" xml:space="preserve">
+    <value>Insecure random</value>
+  </data>
+  <data name="SEC005_MessageFormat" xml:space="preserve">
+    <value>Insecure random: {0}</value>
+  </data>
+  <data name="SEC005_Description" xml:space="preserve">
+    <value>Use cryptographically secure random number generators for security</value>
+  </data>
+
+  <!-- SEC006 -->
+  <data name="SEC006_Title" xml:space="preserve">
+    <value>Regex DoS risk</value>
+  </data>
+  <data name="SEC006_MessageFormat" xml:space="preserve">
+    <value>Regex DoS risk: {0}</value>
+  </data>
+  <data name="SEC006_Description" xml:space="preserve">
+    <value>Set reasonable timeouts for regex operations</value>
+  </data>
+
+  <!-- SEC007 -->
+  <data name="SEC007_Title" xml:space="preserve">
+    <value>Resource leak</value>
+  </data>
+  <data name="SEC007_MessageFormat" xml:space="preserve">
+    <value>IDisposable object '{0}' not in using statement</value>
+  </data>
+  <data name="SEC007_Description" xml:space="preserve">
+    <value>Use 'using' statements to ensure proper resource disposal</value>
+  </data>
+
+  <!-- SEC008 -->
+  <data name="SEC008_Title" xml:space="preserve">
+    <value>Insecure temp file</value>
+  </data>
+  <data name="SEC008_MessageFormat" xml:space="preserve">
+    <value>Insecure temp file: {0}</value>
+  </data>
+  <data name="SEC008_Description" xml:space="preserve">
+    <value>Use secure methods when creating temporary files</value>
+  </data>
+
+  <!-- SEC009 -->
+  <data name="SEC009_Title" xml:space="preserve">
+    <value>Unsafe reflection</value>
+  </data>
+  <data name="SEC009_MessageFormat" xml:space="preserve">
+    <value>Unsafe reflection: {0}</value>
+  </data>
+  <data name="SEC009_Description" xml:space="preserve">
+    <value>Validate and restrict reflectable types and methods</value>
+  </data>
+
+  <!-- SEC010 -->
+  <data name="SEC010_Title" xml:space="preserve">
+    <value>Race condition</value>
+  </data>
+  <data name="SEC010_MessageFormat" xml:space="preserve">
+    <value>Race condition: {0}</value>
+  </data>
+  <data name="SEC010_Description" xml:space="preserve">
+    <value>Use thread-safe collections in multi-threaded environments</value>
+  </data>
+
+  <!-- SEC011 -->
+  <data name="SEC011_Title" xml:space="preserve">
+    <value>Insecure IPC</value>
+  </data>
+  <data name="SEC011_MessageFormat" xml:space="preserve">
+    <value>Using insecure WCF binding: {0}</value>
+  </data>
+  <data name="SEC011_Description" xml:space="preserve">
+    <value>Use secure binding types for WCF communication</value>
+  </data>
+
+  <!-- DLL003 Args -->
+  <data name="DLL003_Arg_Unknown" xml:space="preserve">
+    <value>unknown DLL</value>
+  </data>
+  <data name="DLL003_Arg_NotFound" xml:space="preserve">
+    <value>{0} not found</value>
+  </data>
+  <data name="DLL003_Arg_InvalidSig" xml:space="preserve">
+    <value>{0} has invalid or missing signature</value>
+  </data>
+
+  <!-- SEC002 Args -->
+  <data name="SEC002_Arg_Method" xml:space="preserve">
+    <value>via {0} method</value>
+  </data>
+  <data name="SEC002_Arg_Concat" xml:space="preserve">
+    <value>via string concatenation</value>
+  </data>
+  <data name="SEC002_Arg_Interpolation" xml:space="preserve">
+    <value>via string interpolation</value>
+  </data>
+
+  <!-- SEC003 Args -->
+  <data name="SEC003_Arg_Interpolation" xml:space="preserve">
+    <value>string interpolation</value>
+  </data>
+  <data name="SEC003_Arg_Concat" xml:space="preserve">
+    <value>string concatenation</value>
+  </data>
+
+  <!-- SEC004 Args -->
+  <data name="SEC004_Arg_NewType" xml:space="preserve">
+    <value>new {0}()</value>
+  </data>
+  <data name="SEC004_Arg_HandlingUnsafe" xml:space="preserve">
+    <value>TypeNameHandling = {0} is unsafe</value>
+  </data>
+  <data name="SEC004_Arg_HandlingRecommend" xml:space="preserve">
+    <value>TypeNameHandling = {0}, recommend using None</value>
+  </data>
+
+  <!-- SEC005 Args -->
+  <data name="SEC005_Arg_Construct" xml:space="preserve">
+    <value>new Random() is not cryptographically secure</value>
+  </data>
+  <data name="SEC005_Arg_MethodCall" xml:space="preserve">
+    <value>Random.{0}() is not cryptographically secure</value>
+  </data>
+
+  <!-- SEC006 Args -->
+  <data name="SEC006_Arg_NewRegex" xml:space="preserve">
+    <value>new Regex() without timeout</value>
+  </data>
+  <data name="SEC006_Arg_StaticRegex" xml:space="preserve">
+    <value>Regex.{0}() without timeout</value>
+  </data>
+
+  <!-- SEC008 Args -->
+  <data name="SEC008_Arg_InterpPredictable" xml:space="preserve">
+    <value>predictable interpolation: {0}</value>
+  </data>
+  <data name="SEC008_Arg_InterpStructure" xml:space="preserve">
+    <value>string interpolation may be predictable</value>
+  </data>
+  <data name="SEC008_Arg_ConcatTimestamp" xml:space="preserve">
+    <value>timestamp-based: {0}</value>
+  </data>
+  <data name="SEC008_Arg_ConcatStructure" xml:space="preserve">
+    <value>string concatenation may be predictable</value>
+  </data>
+  <data name="SEC008_Arg_FormatStructure" xml:space="preserve">
+    <value>string.Format may be predictable</value>
+  </data>
+  <data name="SEC008_Arg_Timestamp1" xml:space="preserve">
+    <value>timestamp: {0}</value>
+  </data>
+  <data name="SEC008_Arg_Timestamp2" xml:space="preserve">
+    <value>timestamp: {0}</value>
+  </data>
+
+  <!-- SEC009 Args -->
+  <data name="SEC009_Arg_GetType" xml:space="preserve">
+    <value>Type.GetType with dynamic input</value>
+  </data>
+  <data name="SEC009_Arg_NonPublic" xml:space="preserve">
+    <value>{0} with BindingFlags.NonPublic</value>
+  </data>
+  <data name="SEC009_Arg_Invoke" xml:space="preserve">
+    <value>MethodInfo.Invoke on reflected method</value>
+  </data>
+
+  <!-- SEC010 Args -->
+  <data name="SEC010_Arg_Increment" xml:space="preserve">
+    <value>field increment without lock</value>
+  </data>
+  <data name="SEC010_Arg_Decrement" xml:space="preserve">
+    <value>field decrement without lock</value>
+  </data>
+  <data name="SEC010_Arg_Compound" xml:space="preserve">
+    <value>compound assignment ({0}) without lock</value>
+  </data>
+  <data name="SEC010_Arg_CheckThenUse" xml:space="preserve">
+    <value>check-then-use on field '{0}' without lock</value>
+  </data>
+  <data name="SEC010_Arg_CollectionMethod" xml:space="preserve">
+    <value>collection.{0}() without lock</value>
+  </data>
+  <data name="SEC010_Arg_CollectionIndexer" xml:space="preserve">
+    <value>collection indexer without lock</value>
+  </data>
+
+  <!-- SEC011 Args -->
+  <data name="SEC011_Arg_BasicHttp" xml:space="preserve">
+    <value>BasicHttpBinding without security mode</value>
+  </data>
+  <data name="SEC011_Arg_SecurityNone" xml:space="preserve">
+    <value>{0} with SecurityMode.None</value>
+  </data>
+  <data name="SEC011_Arg_HttpEndpoint" xml:space="preserve">
+    <value>HTTP endpoint (not HTTPS)</value>
+  </data>
+  <data name="SEC011_Arg_GrpcHttp" xml:space="preserve">
+    <value>gRPC over HTTP (not HTTPS)</value>
+  </data>
+  <data name="SEC011_Arg_WebClientHttp" xml:space="preserve">
+    <value>WebClient.{0}() over HTTP</value>
+  </data>
+</root>

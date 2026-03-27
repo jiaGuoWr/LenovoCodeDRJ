@@ -67,7 +67,9 @@
     <EmbeddedResource Include="Resources\Strings.resx">
       <SubType>Designer</SubType>
     </EmbeddedResource>
-    <EmbeddedResource Include="Resources\Strings.en.resx" />
+    <EmbeddedResource Include="Resources\Strings.en.resx">
+      <SubType>Designer</SubType>
+    </EmbeddedResource>
   </ItemGroup>
   <ItemGroup>
     <None Include="overview.md" />

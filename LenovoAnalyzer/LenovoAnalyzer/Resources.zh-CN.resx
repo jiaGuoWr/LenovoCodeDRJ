@@ -1,0 +1,365 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <xsd:schema id="root" xmlns="" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:msdata="urn:schemas-microsoft-com:xml-msdata">
+    <xsd:import namespace="http://www.w3.org/XML/1998/namespace" />
+    <xsd:element name="root" msdata:IsDataSet="true">
+      <xsd:complexType>
+        <xsd:choice maxOccurs="unbounded">
+          <xsd:element name="metadata">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" />
+              </xsd:sequence>
+              <xsd:attribute name="name" use="required" type="xsd:string" />
+              <xsd:attribute name="type" type="xsd:string" />
+              <xsd:attribute name="mimetype" type="xsd:string" />
+              <xsd:attribute ref="xml:space" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="assembly">
+            <xsd:complexType>
+              <xsd:attribute name="alias" type="xsd:string" />
+              <xsd:attribute name="name" type="xsd:string" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="data">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+                <xsd:element name="comment" type="xsd:string" minOccurs="0" msdata:Ordinal="2" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" msdata:Ordinal="1" />
+              <xsd:attribute name="type" type="xsd:string" msdata:Ordinal="3" />
+              <xsd:attribute name="mimetype" type="xsd:string" msdata:Ordinal="4" />
+              <xsd:attribute ref="xml:space" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="resheader">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" />
+            </xsd:complexType>
+          </xsd:element>
+        </xsd:choice>
+      </xsd:complexType>
+    </xsd:element>
+  </xsd:schema>
+  <resheader name="resmimetype">
+    <value>text/microsoft-resx</value>
+  </resheader>
+  <resheader name="version">
+    <value>2.0</value>
+  </resheader>
+  <resheader name="reader">
+    <value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <resheader name="writer">
+    <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+
+  <!-- CHN001 -->
+  <data name="CHN001_Title" xml:space="preserve">
+    <value>注释包含中文</value>
+  </data>
+  <data name="CHN001_MessageFormat" xml:space="preserve">
+    <value>注释包含中文字符: '{0}'</value>
+  </data>
+  <data name="CHN001_Description" xml:space="preserve">
+    <value>代码注释应使用英文以便国际团队协作</value>
+  </data>
+
+  <!-- DLL002 -->
+  <data name="DLL002_Title" xml:space="preserve">
+    <value>缺少 DllImportSearchPaths</value>
+  </data>
+  <data name="DLL002_MessageFormat" xml:space="preserve">
+    <value>DllImport 缺少 DefaultDllImportSearchPaths 属性</value>
+  </data>
+  <data name="DLL002_Description" xml:space="preserve">
+    <value>指定 DefaultDllImportSearchPaths 以防止 DLL 劫持攻击</value>
+  </data>
+
+  <!-- DLL003 -->
+  <data name="DLL003_Title" xml:space="preserve">
+    <value>DLL 签名不安全</value>
+  </data>
+  <data name="DLL003_MessageFormat" xml:space="preserve">
+    <value>{0}</value>
+  </data>
+  <data name="DLL003_Description" xml:space="preserve">
+    <value>引用的 DLL 应具有有效的数字签名</value>
+  </data>
+
+  <!-- EXC001 -->
+  <data name="EXC001_Title" xml:space="preserve">
+    <value>catch 中打印堆栈</value>
+  </data>
+  <data name="EXC001_MessageFormat" xml:space="preserve">
+    <value>不应在 catch 块中打印完整堆栈信息</value>
+  </data>
+  <data name="EXC001_Description" xml:space="preserve">
+    <value>打印完整堆栈信息可能暴露系统内部结构</value>
+  </data>
+
+  <!-- CODE001 -->
+  <data name="CODE001_Title" xml:space="preserve">
+    <value>注释中包含代码</value>
+  </data>
+  <data name="CODE001_MessageFormat" xml:space="preserve">
+    <value>注释包含代码片段: '{0}'</value>
+  </data>
+  <data name="CODE001_Description" xml:space="preserve">
+    <value>注释不应包含被注释掉的代码</value>
+  </data>
+
+  <!-- SEC001 -->
+  <data name="SEC001_Title" xml:space="preserve">
+    <value>代码中包含敏感信息</value>
+  </data>
+  <data name="SEC001_MessageFormat" xml:space="preserve">
+    <value>变量 '{0}' 可能包含硬编码的敏感信息</value>
+  </data>
+  <data name="SEC001_Description" xml:space="preserve">
+    <value>敏感信息不应硬编码在代码中</value>
+  </data>
+
+  <!-- SEC002 -->
+  <data name="SEC002_Title" xml:space="preserve">
+    <value>路径遍历风险</value>
+  </data>
+  <data name="SEC002_MessageFormat" xml:space="preserve">
+    <value>路径遍历风险: {0}</value>
+  </data>
+  <data name="SEC002_Description" xml:space="preserve">
+    <value>验证和规范化路径以防止目录遍历攻击</value>
+  </data>
+
+  <!-- SEC003 -->
+  <data name="SEC003_Title" xml:space="preserve">
+    <value>SQL 注入风险</value>
+  </data>
+  <data name="SEC003_MessageFormat" xml:space="preserve">
+    <value>SQL 注入风险: {0}</value>
+  </data>
+  <data name="SEC003_Description" xml:space="preserve">
+    <value>使用参数化查询以防止 SQL 注入</value>
+  </data>
+
+  <!-- SEC004 -->
+  <data name="SEC004_Title" xml:space="preserve">
+    <value>不安全的反序列化</value>
+  </data>
+  <data name="SEC004_MessageFormat" xml:space="preserve">
+    <value>使用了不安全的反序列化器: {0}</value>
+  </data>
+  <data name="SEC004_Description" xml:space="preserve">
+    <value>BinaryFormatter 等反序列化器存在远程代码执行风险</value>
+  </data>
+
+  <!-- SEC005 -->
+  <data name="SEC005_Title" xml:space="preserve">
+    <value>不安全的随机数</value>
+  </data>
+  <data name="SEC005_MessageFormat" xml:space="preserve">
+    <value>不安全的随机数: {0}</value>
+  </data>
+  <data name="SEC005_Description" xml:space="preserve">
+    <value>安全场景应使用加密级随机数生成器</value>
+  </data>
+
+  <!-- SEC006 -->
+  <data name="SEC006_Title" xml:space="preserve">
+    <value>正则 DoS 风险</value>
+  </data>
+  <data name="SEC006_MessageFormat" xml:space="preserve">
+    <value>正则 DoS 风险: {0}</value>
+  </data>
+  <data name="SEC006_Description" xml:space="preserve">
+    <value>为正则表达式操作设置合理的超时时间</value>
+  </data>
+
+  <!-- SEC007 -->
+  <data name="SEC007_Title" xml:space="preserve">
+    <value>资源泄漏</value>
+  </data>
+  <data name="SEC007_MessageFormat" xml:space="preserve">
+    <value>IDisposable 对象 '{0}' 未在 using 语句中</value>
+  </data>
+  <data name="SEC007_Description" xml:space="preserve">
+    <value>使用 using 语句确保资源正确释放</value>
+  </data>
+
+  <!-- SEC008 -->
+  <data name="SEC008_Title" xml:space="preserve">
+    <value>不安全的临时文件</value>
+  </data>
+  <data name="SEC008_MessageFormat" xml:space="preserve">
+    <value>不安全的临时文件: {0}</value>
+  </data>
+  <data name="SEC008_Description" xml:space="preserve">
+    <value>创建临时文件时应使用安全方式</value>
+  </data>
+
+  <!-- SEC009 -->
+  <data name="SEC009_Title" xml:space="preserve">
+    <value>不安全的反射</value>
+  </data>
+  <data name="SEC009_MessageFormat" xml:space="preserve">
+    <value>不安全的反射: {0}</value>
+  </data>
+  <data name="SEC009_Description" xml:space="preserve">
+    <value>验证和限制可反射的类型和方法</value>
+  </data>
+
+  <!-- SEC010 -->
+  <data name="SEC010_Title" xml:space="preserve">
+    <value>竞态条件</value>
+  </data>
+  <data name="SEC010_MessageFormat" xml:space="preserve">
+    <value>竞态条件: {0}</value>
+  </data>
+  <data name="SEC010_Description" xml:space="preserve">
+    <value>在多线程环境中使用线程安全集合</value>
+  </data>
+
+  <!-- SEC011 -->
+  <data name="SEC011_Title" xml:space="preserve">
+    <value>不安全的 IPC</value>
+  </data>
+  <data name="SEC011_MessageFormat" xml:space="preserve">
+    <value>使用了不安全的 WCF 绑定: {0}</value>
+  </data>
+  <data name="SEC011_Description" xml:space="preserve">
+    <value>WCF 通信应使用安全的绑定类型</value>
+  </data>
+
+  <!-- DLL003 Args -->
+  <data name="DLL003_Arg_Unknown" xml:space="preserve">
+    <value>未知 DLL</value>
+  </data>
+  <data name="DLL003_Arg_NotFound" xml:space="preserve">
+    <value>{0} 未找到</value>
+  </data>
+  <data name="DLL003_Arg_InvalidSig" xml:space="preserve">
+    <value>{0} 签名无效或缺失</value>
+  </data>
+
+  <!-- SEC002 Args -->
+  <data name="SEC002_Arg_Method" xml:space="preserve">
+    <value>通过 {0} 方法</value>
+  </data>
+  <data name="SEC002_Arg_Concat" xml:space="preserve">
+    <value>通过字符串拼接</value>
+  </data>
+  <data name="SEC002_Arg_Interpolation" xml:space="preserve">
+    <value>通过字符串插值</value>
+  </data>
+
+  <!-- SEC003 Args -->
+  <data name="SEC003_Arg_Interpolation" xml:space="preserve">
+    <value>字符串插值</value>
+  </data>
+  <data name="SEC003_Arg_Concat" xml:space="preserve">
+    <value>字符串拼接</value>
+  </data>
+
+  <!-- SEC004 Args -->
+  <data name="SEC004_Arg_NewType" xml:space="preserve">
+    <value>new {0}()</value>
+  </data>
+  <data name="SEC004_Arg_HandlingUnsafe" xml:space="preserve">
+    <value>TypeNameHandling = {0} 不安全</value>
+  </data>
+  <data name="SEC004_Arg_HandlingRecommend" xml:space="preserve">
+    <value>TypeNameHandling = {0}，建议使用 None</value>
+  </data>
+
+  <!-- SEC005 Args -->
+  <data name="SEC005_Arg_Construct" xml:space="preserve">
+    <value>new Random() 非密码学安全</value>
+  </data>
+  <data name="SEC005_Arg_MethodCall" xml:space="preserve">
+    <value>Random.{0}() 非密码学安全</value>
+  </data>
+
+  <!-- SEC006 Args -->
+  <data name="SEC006_Arg_NewRegex" xml:space="preserve">
+    <value>new Regex() 缺少超时</value>
+  </data>
+  <data name="SEC006_Arg_StaticRegex" xml:space="preserve">
+    <value>Regex.{0}() 缺少超时</value>
+  </data>
+
+  <!-- SEC008 Args -->
+  <data name="SEC008_Arg_InterpPredictable" xml:space="preserve">
+    <value>可预测的插值: {0}</value>
+  </data>
+  <data name="SEC008_Arg_InterpStructure" xml:space="preserve">
+    <value>字符串插值可能可预测</value>
+  </data>
+  <data name="SEC008_Arg_ConcatTimestamp" xml:space="preserve">
+    <value>基于时间戳: {0}</value>
+  </data>
+  <data name="SEC008_Arg_ConcatStructure" xml:space="preserve">
+    <value>字符串拼接可能可预测</value>
+  </data>
+  <data name="SEC008_Arg_FormatStructure" xml:space="preserve">
+    <value>string.Format 可能可预测</value>
+  </data>
+  <data name="SEC008_Arg_Timestamp1" xml:space="preserve">
+    <value>时间戳: {0}</value>
+  </data>
+  <data name="SEC008_Arg_Timestamp2" xml:space="preserve">
+    <value>时间戳: {0}</value>
+  </data>
+
+  <!-- SEC009 Args -->
+  <data name="SEC009_Arg_GetType" xml:space="preserve">
+    <value>Type.GetType 使用动态输入</value>
+  </data>
+  <data name="SEC009_Arg_NonPublic" xml:space="preserve">
+    <value>{0} 使用 BindingFlags.NonPublic</value>
+  </data>
+  <data name="SEC009_Arg_Invoke" xml:space="preserve">
+    <value>反射方法的 MethodInfo.Invoke</value>
+  </data>
+
+  <!-- SEC010 Args -->
+  <data name="SEC010_Arg_Increment" xml:space="preserve">
+    <value>字段自增缺少锁</value>
+  </data>
+  <data name="SEC010_Arg_Decrement" xml:space="preserve">
+    <value>字段自减缺少锁</value>
+  </data>
+  <data name="SEC010_Arg_Compound" xml:space="preserve">
+    <value>复合赋值 ({0}) 缺少锁</value>
+  </data>
+  <data name="SEC010_Arg_CheckThenUse" xml:space="preserve">
+    <value>字段 '{0}' 的检查后使用缺少锁</value>
+  </data>
+  <data name="SEC010_Arg_CollectionMethod" xml:space="preserve">
+    <value>collection.{0}() 缺少锁</value>
+  </data>
+  <data name="SEC010_Arg_CollectionIndexer" xml:space="preserve">
+    <value>集合索引器缺少锁</value>
+  </data>
+
+  <!-- SEC011 Args -->
+  <data name="SEC011_Arg_BasicHttp" xml:space="preserve">
+    <value>BasicHttpBinding 未设置安全模式</value>
+  </data>
+  <data name="SEC011_Arg_SecurityNone" xml:space="preserve">
+    <value>{0} 使用 SecurityMode.None</value>
+  </data>
+  <data name="SEC011_Arg_HttpEndpoint" xml:space="preserve">
+    <value>HTTP 端点（非 HTTPS）</value>
+  </data>
+  <data name="SEC011_Arg_GrpcHttp" xml:space="preserve">
+    <value>gRPC 通过 HTTP（非 HTTPS）</value>
+  </data>
+  <data name="SEC011_Arg_WebClientHttp" xml:space="preserve">
+    <value>WebClient.{0}() 通过 HTTP</value>
+  </data>
+</root>

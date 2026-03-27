@@ -14,7 +14,6 @@ using System.Linq;
 using System.Collections.Immutable;
 using System.Collections.Concurrent;
 using Microsoft.VisualStudio;
-using LenovoAnalyzer;
 using System.Runtime.InteropServices;
 using System.Diagnostics;
 using VSIXProject1.Localization;
@@ -391,19 +390,16 @@ namespace VSIXProject1
             try
             {
                 var dialog = new LanguageSelectDialog(LocalizationService.CurrentLanguage);
-                // We show dialog without explicit owner since we are invoked from menu, or we could resolve main window
                 bool? result = dialog.ShowDialog();
                 if (result == true)
                 {
                     LocalizationService.SetLanguage(dialog.SelectedLanguage, package);
                     
-                    // Trigger refresh on active tool window if it exists
                     var existingWindow = package.FindToolWindow(typeof(SummaryToolWindow), 0, false) as SummaryToolWindow;
                     if (existingWindow != null && !existingWindow.IsDisposed)
                     {
-                        // The UI texts automatically update due to TranslationProvider Refresh
-                        // We also need to refresh Git status which contains dynamic localized text
                         existingWindow.UpdateGitStatus();
+                        RequestAnalysisRefresh(immediate: true);
                     }
                 }
             }

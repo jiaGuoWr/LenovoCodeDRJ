@@ -2,9 +2,8 @@ using System;
 using System.Globalization;
 using System.Resources;
 using System.Threading;
-using Microsoft.VisualStudio.Settings;
 using Microsoft.VisualStudio.Shell;
-using Microsoft.VisualStudio.Shell.Settings;
+using LenovoAnalyzer;
 
 namespace VSIXProject1.Localization
 {
@@ -14,7 +13,12 @@ namespace VSIXProject1.Localization
     public enum SupportedLanguage
     {
         /// <summary>
-        /// Simplified Chinese (zh-CN) - Default
+        /// Auto-detect from IDE language
+        /// </summary>
+        Auto = -1,
+
+        /// <summary>
+        /// Simplified Chinese (zh-CN)
         /// </summary>
         ChineseSimplified = 0,
 
@@ -29,10 +33,7 @@ namespace VSIXProject1.Localization
     /// </summary>
     public static class LocalizationService
     {
-        private const string CollectionPath = "LenovoDirenjie";
-        private const string LanguageProperty = "Language";
-
-        private static SupportedLanguage _currentLanguage = SupportedLanguage.ChineseSimplified;
+        private static SupportedLanguage _currentLanguage = SupportedLanguage.Auto;
         private static ResourceManager _resourceManager;
         private static bool _isInitialized = false;
         private static readonly object _lock = new object();
@@ -43,20 +44,17 @@ namespace VSIXProject1.Localization
         public static event EventHandler LanguageChanged;
 
         /// <summary>
-        /// Gets the current language setting
+        /// Gets the current effective language (resolves Auto to actual language)
         /// </summary>
         public static SupportedLanguage CurrentLanguage
         {
-            get => _currentLanguage;
-            private set
+            get
             {
-                if (_currentLanguage != value)
+                if (_currentLanguage == SupportedLanguage.Auto)
                 {
-                    _currentLanguage = value;
-                    UpdateCulture();
-                    LanguageChanged?.Invoke(null, EventArgs.Empty);
-                    TranslationProvider.Instance.Refresh();
+                    return DetectIdeLanguage();
                 }
+                return _currentLanguage;
             }
         }
 
@@ -64,6 +62,26 @@ namespace VSIXProject1.Localization
         /// Gets the CultureInfo for the current language
         /// </summary>
         public static CultureInfo CurrentCulture => GetCultureInfo(CurrentLanguage);
+
+        /// <summary>
+        /// Detects the IDE language from Visual Studio settings
+        /// </summary>
+        private static SupportedLanguage DetectIdeLanguage()
+        {
+            try
+            {
+                var culture = Thread.CurrentThread.CurrentUICulture;
+                if (culture.Name.StartsWith("zh", StringComparison.OrdinalIgnoreCase))
+                {
+                    return SupportedLanguage.ChineseSimplified;
+                }
+                return SupportedLanguage.English;
+            }
+            catch
+            {
+                return SupportedLanguage.English;
+            }
+        }
 
         /// <summary>
         /// Initialize the localization service
@@ -80,13 +98,15 @@ namespace VSIXProject1.Localization
                         "VSIXLenovoQiraDRJ.Resources.Strings",
                         typeof(LocalizationService).Assembly);
 
-                    LoadFromSettings(package);
+                    _currentLanguage = SupportedLanguage.Auto;
+                    UpdateCulture();
+                    NotifyAnalyzer();
                     _isInitialized = true;
                 }
                 catch (Exception ex)
                 {
                     System.Diagnostics.Debug.WriteLine($"LocalizationService initialization error: {ex.Message}");
-                    _currentLanguage = SupportedLanguage.ChineseSimplified;
+                    _currentLanguage = SupportedLanguage.Auto;
                     _isInitialized = true;
                 }
             }
@@ -133,70 +153,36 @@ namespace VSIXProject1.Localization
         }
 
         /// <summary>
-        /// Set the current language
+        /// Set the current language (only for current session, not persisted)
         /// </summary>
         public static void SetLanguage(SupportedLanguage language, AsyncPackage package = null)
         {
-            CurrentLanguage = language;
-            if (package != null)
+            var oldEffectiveLanguage = CurrentLanguage;
+            _currentLanguage = language;
+            var newEffectiveLanguage = CurrentLanguage;
+
+            if (oldEffectiveLanguage != newEffectiveLanguage)
             {
-                SaveToSettings(package);
+                UpdateCulture();
+                NotifyAnalyzer();
+                LanguageChanged?.Invoke(null, EventArgs.Empty);
+                TranslationProvider.Instance.Refresh();
             }
         }
 
         /// <summary>
-        /// Load language setting from VS settings store
+        /// Notify the analyzer about language change
         /// </summary>
-        public static void LoadFromSettings(AsyncPackage package)
+        private static void NotifyAnalyzer()
         {
-            ThreadHelper.ThrowIfNotOnUIThread();
-
             try
             {
-                var settingsManager = new ShellSettingsManager(package);
-                var userSettingsStore = settingsManager.GetReadOnlySettingsStore(SettingsScope.UserSettings);
-
-                if (userSettingsStore.CollectionExists(CollectionPath))
-                {
-                    if (userSettingsStore.PropertyExists(CollectionPath, LanguageProperty))
-                    {
-                        int languageValue = userSettingsStore.GetInt32(CollectionPath, LanguageProperty);
-                        if (Enum.IsDefined(typeof(SupportedLanguage), languageValue))
-                        {
-                            _currentLanguage = (SupportedLanguage)languageValue;
-                            UpdateCulture();
-                        }
-                    }
-                }
+                var cultureName = GetCultureInfo(CurrentLanguage).Name;
+                AnalyzerLanguageSettings.SetLanguage(cultureName);
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"LoadFromSettings error: {ex.Message}");
-            }
-        }
-
-        /// <summary>
-        /// Save language setting to VS settings store
-        /// </summary>
-        public static void SaveToSettings(AsyncPackage package)
-        {
-            ThreadHelper.ThrowIfNotOnUIThread();
-
-            try
-            {
-                var settingsManager = new ShellSettingsManager(package);
-                var userSettingsStore = settingsManager.GetWritableSettingsStore(SettingsScope.UserSettings);
-
-                if (!userSettingsStore.CollectionExists(CollectionPath))
-                {
-                    userSettingsStore.CreateCollection(CollectionPath);
-                }
-
-                userSettingsStore.SetInt32(CollectionPath, LanguageProperty, (int)_currentLanguage);
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"SaveToSettings error: {ex.Message}");
+                System.Diagnostics.Debug.WriteLine($"NotifyAnalyzer error: {ex.Message}");
             }
         }
 
@@ -222,6 +208,8 @@ namespace VSIXProject1.Localization
         {
             switch (language)
             {
+                case SupportedLanguage.Auto:
+                    return GetString("Lang_Auto");
                 case SupportedLanguage.English:
                     return GetString("Lang_English");
                 case SupportedLanguage.ChineseSimplified:
@@ -232,8 +220,10 @@ namespace VSIXProject1.Localization
 
         private static void UpdateCulture()
         {
-            var culture = GetCultureInfo(_currentLanguage);
-            Thread.CurrentThread.CurrentUICulture = culture;
+            // Do not modify Thread.CurrentThread.CurrentUICulture
+            // as it affects VS internal components and can cause crashes
+            // when switching to a language that VS doesn't have resources for.
+            // We only use CurrentCulture in our own GetString() calls.
         }
     }
 }

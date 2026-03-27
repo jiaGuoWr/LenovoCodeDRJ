@@ -111,16 +111,12 @@ namespace VSIXProject1
 
         private string GetLineLabel(int line)
         {
-            return LocalizationService.CurrentLanguage == SupportedLanguage.English
-                ? $"[Line {line}]"
-                : $"[行 {line}]";
+            return LocalizationService.GetString("Message_LineNumber", line);
         }
 
         private string GetUnknownFileText()
         {
-            return LocalizationService.CurrentLanguage == SupportedLanguage.English
-                ? "Unknown file"
-                : "未知文件";
+            return LocalizationService.GetString("Message_UnknownFile");
         }
 
         private void InitializeEventHandlers()

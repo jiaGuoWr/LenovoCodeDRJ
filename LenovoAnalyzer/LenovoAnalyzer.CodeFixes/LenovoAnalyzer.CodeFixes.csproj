@@ -14,4 +14,16 @@
 	  <ProjectReference Include="..\LenovoAnalyzer\LenovoAnalyzer.csproj" />
 	</ItemGroup>
 
+	<ItemGroup>
+		<EmbeddedResource Update="CodeFixResources.resx">
+			<Generator>ResXFileCodeGenerator</Generator>
+			<LastGenOutput>CodeFixResources.Designer.cs</LastGenOutput>
+		</EmbeddedResource>
+		<Compile Update="CodeFixResources.Designer.cs">
+			<DesignTime>True</DesignTime>
+			<AutoGen>True</AutoGen>
+			<DependentUpon>CodeFixResources.resx</DependentUpon>
+		</Compile>
+	</ItemGroup>
+
 </Project>

@@ -13,58 +13,149 @@ using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Diagnostics;
 using System.Collections.Generic;
 using Microsoft.CodeAnalysis.Text;
+using LenovoAnalyzer;
 
 [DiagnosticAnalyzer(LanguageNames.CSharp)]
 public class LenovoQiraCodeAnalyzerAnalyzer : DiagnosticAnalyzer
 {
-            public const string DiagnosticId = "CHN001";
-    private static readonly DiagnosticDescriptor Rule = new DiagnosticDescriptor(
-        DiagnosticId, "CHN001", "CHN001", "CodeStyle", DiagnosticSeverity.Warning, isEnabledByDefault: true);
+    #region Diagnostic IDs
+    public const string DiagnosticId = "CHN001";
     public const string DLL002Id = "DLL002";
-    private static readonly DiagnosticDescriptor MissingDllImportSearchPathsRule = new DiagnosticDescriptor(
-        DLL002Id, "DLL002", "DLL002", "CodeStyle", DiagnosticSeverity.Warning, isEnabledByDefault: true);
+    public const string MissingDllImportSearchPathsId = DLL002Id;
     public const string EXC001Id = "EXC001";
-    private static readonly DiagnosticDescriptor InvalidStackTraceUsageRule = new DiagnosticDescriptor(
-        EXC001Id, "EXC001", "EXC001", "Security", DiagnosticSeverity.Warning, isEnabledByDefault: true);
+    public const string InvalidStackTraceUsageId = EXC001Id;
     public const string DLL003Id = "DLL003";
-    private static readonly DiagnosticDescriptor UnsafeDllSignatureRule = new DiagnosticDescriptor(
-        DLL003Id, "DLL003", "DLL003", "Security", DiagnosticSeverity.Warning, isEnabledByDefault: true);
+    public const string UnsafeDllSignatureId = DLL003Id;
     public const string CODE001Id = "CODE001";
-    private static readonly DiagnosticDescriptor InvalidCommentedCodeRule = new DiagnosticDescriptor(
-        CODE001Id, "CODE001", "CODE001", "CodeStyle", DiagnosticSeverity.Warning, isEnabledByDefault: true);
+    public const string InvalidCommentedCodeId = CODE001Id;
     public const string SEC001Id = "SEC001";
-    private static readonly DiagnosticDescriptor SensitiveInfoInCodeRule = new DiagnosticDescriptor(
-        SEC001Id, "SEC001", "SEC001", "Security", DiagnosticSeverity.Warning, isEnabledByDefault: true);
     public const string SEC002Id = "SEC002";
-    private static readonly DiagnosticDescriptor PathTraversalRule = new DiagnosticDescriptor(
-        SEC002Id, "SEC002", "SEC002", "Security", DiagnosticSeverity.Warning, isEnabledByDefault: true);
     public const string SEC003Id = "SEC003";
-    private static readonly DiagnosticDescriptor SqlInjectionRule = new DiagnosticDescriptor(
-        SEC003Id, "SEC003", "SEC003", "Security", DiagnosticSeverity.Warning, isEnabledByDefault: true);
     public const string SEC004Id = "SEC004";
-    private static readonly DiagnosticDescriptor UnsafeDeserializationRule = new DiagnosticDescriptor(
-        SEC004Id, "SEC004", "SEC004", "Security", DiagnosticSeverity.Warning, isEnabledByDefault: true);
     public const string SEC005Id = "SEC005";
-    private static readonly DiagnosticDescriptor InsecureRandomRule = new DiagnosticDescriptor(
-        SEC005Id, "SEC005", "SEC005", "Security", DiagnosticSeverity.Warning, isEnabledByDefault: true);
     public const string SEC006Id = "SEC006";
-    private static readonly DiagnosticDescriptor RegexDosRule = new DiagnosticDescriptor(
-        SEC006Id, "SEC006", "SEC006", "Security", DiagnosticSeverity.Warning, isEnabledByDefault: true);
     public const string SEC007Id = "SEC007";
-    private static readonly DiagnosticDescriptor ResourceLeakRule = new DiagnosticDescriptor(
-        SEC007Id, "SEC007", "SEC007", "Security", DiagnosticSeverity.Warning, isEnabledByDefault: true);
     public const string SEC008Id = "SEC008";
-    private static readonly DiagnosticDescriptor InsecureTempFileRule = new DiagnosticDescriptor(
-        SEC008Id, "SEC008", "SEC008", "Security", DiagnosticSeverity.Warning, isEnabledByDefault: true);
     public const string SEC009Id = "SEC009";
-    private static readonly DiagnosticDescriptor UnsafeReflectionRule = new DiagnosticDescriptor(
-        SEC009Id, "SEC009", "SEC009", "Security", DiagnosticSeverity.Warning, isEnabledByDefault: true);
     public const string SEC010Id = "SEC010";
-    private static readonly DiagnosticDescriptor RaceConditionRule = new DiagnosticDescriptor(
-        SEC010Id, "SEC010", "SEC010", "Security", DiagnosticSeverity.Warning, isEnabledByDefault: true);
     public const string SEC011Id = "SEC011";
+    #endregion
+
+    #region Localizable Strings
+    private static readonly LocalizableString Title_CHN001 = new LocalizableResourceString(nameof(Resources.CHN001_Title), Resources.ResourceManager, typeof(Resources));
+    private static readonly LocalizableString Message_CHN001 = new LocalizableResourceString(nameof(Resources.CHN001_MessageFormat), Resources.ResourceManager, typeof(Resources));
+    private static readonly LocalizableString Desc_CHN001 = new LocalizableResourceString(nameof(Resources.CHN001_Description), Resources.ResourceManager, typeof(Resources));
+
+    private static readonly LocalizableString Title_DLL002 = new LocalizableResourceString(nameof(Resources.DLL002_Title), Resources.ResourceManager, typeof(Resources));
+    private static readonly LocalizableString Message_DLL002 = new LocalizableResourceString(nameof(Resources.DLL002_MessageFormat), Resources.ResourceManager, typeof(Resources));
+    private static readonly LocalizableString Desc_DLL002 = new LocalizableResourceString(nameof(Resources.DLL002_Description), Resources.ResourceManager, typeof(Resources));
+
+    private static readonly LocalizableString Title_DLL003 = new LocalizableResourceString(nameof(Resources.DLL003_Title), Resources.ResourceManager, typeof(Resources));
+    private static readonly LocalizableString Message_DLL003 = new LocalizableResourceString(nameof(Resources.DLL003_MessageFormat), Resources.ResourceManager, typeof(Resources));
+    private static readonly LocalizableString Desc_DLL003 = new LocalizableResourceString(nameof(Resources.DLL003_Description), Resources.ResourceManager, typeof(Resources));
+
+    private static readonly LocalizableString Title_EXC001 = new LocalizableResourceString(nameof(Resources.EXC001_Title), Resources.ResourceManager, typeof(Resources));
+    private static readonly LocalizableString Message_EXC001 = new LocalizableResourceString(nameof(Resources.EXC001_MessageFormat), Resources.ResourceManager, typeof(Resources));
+    private static readonly LocalizableString Desc_EXC001 = new LocalizableResourceString(nameof(Resources.EXC001_Description), Resources.ResourceManager, typeof(Resources));
+
+    private static readonly LocalizableString Title_CODE001 = new LocalizableResourceString(nameof(Resources.CODE001_Title), Resources.ResourceManager, typeof(Resources));
+    private static readonly LocalizableString Message_CODE001 = new LocalizableResourceString(nameof(Resources.CODE001_MessageFormat), Resources.ResourceManager, typeof(Resources));
+    private static readonly LocalizableString Desc_CODE001 = new LocalizableResourceString(nameof(Resources.CODE001_Description), Resources.ResourceManager, typeof(Resources));
+
+    private static readonly LocalizableString Title_SEC001 = new LocalizableResourceString(nameof(Resources.SEC001_Title), Resources.ResourceManager, typeof(Resources));
+    private static readonly LocalizableString Message_SEC001 = new LocalizableResourceString(nameof(Resources.SEC001_MessageFormat), Resources.ResourceManager, typeof(Resources));
+    private static readonly LocalizableString Desc_SEC001 = new LocalizableResourceString(nameof(Resources.SEC001_Description), Resources.ResourceManager, typeof(Resources));
+
+    private static readonly LocalizableString Title_SEC002 = new LocalizableResourceString(nameof(Resources.SEC002_Title), Resources.ResourceManager, typeof(Resources));
+    private static readonly LocalizableString Message_SEC002 = new LocalizableResourceString(nameof(Resources.SEC002_MessageFormat), Resources.ResourceManager, typeof(Resources));
+    private static readonly LocalizableString Desc_SEC002 = new LocalizableResourceString(nameof(Resources.SEC002_Description), Resources.ResourceManager, typeof(Resources));
+
+    private static readonly LocalizableString Title_SEC003 = new LocalizableResourceString(nameof(Resources.SEC003_Title), Resources.ResourceManager, typeof(Resources));
+    private static readonly LocalizableString Message_SEC003 = new LocalizableResourceString(nameof(Resources.SEC003_MessageFormat), Resources.ResourceManager, typeof(Resources));
+    private static readonly LocalizableString Desc_SEC003 = new LocalizableResourceString(nameof(Resources.SEC003_Description), Resources.ResourceManager, typeof(Resources));
+
+    private static readonly LocalizableString Title_SEC004 = new LocalizableResourceString(nameof(Resources.SEC004_Title), Resources.ResourceManager, typeof(Resources));
+    private static readonly LocalizableString Message_SEC004 = new LocalizableResourceString(nameof(Resources.SEC004_MessageFormat), Resources.ResourceManager, typeof(Resources));
+    private static readonly LocalizableString Desc_SEC004 = new LocalizableResourceString(nameof(Resources.SEC004_Description), Resources.ResourceManager, typeof(Resources));
+
+    private static readonly LocalizableString Title_SEC005 = new LocalizableResourceString(nameof(Resources.SEC005_Title), Resources.ResourceManager, typeof(Resources));
+    private static readonly LocalizableString Message_SEC005 = new LocalizableResourceString(nameof(Resources.SEC005_MessageFormat), Resources.ResourceManager, typeof(Resources));
+    private static readonly LocalizableString Desc_SEC005 = new LocalizableResourceString(nameof(Resources.SEC005_Description), Resources.ResourceManager, typeof(Resources));
+
+    private static readonly LocalizableString Title_SEC006 = new LocalizableResourceString(nameof(Resources.SEC006_Title), Resources.ResourceManager, typeof(Resources));
+    private static readonly LocalizableString Message_SEC006 = new LocalizableResourceString(nameof(Resources.SEC006_MessageFormat), Resources.ResourceManager, typeof(Resources));
+    private static readonly LocalizableString Desc_SEC006 = new LocalizableResourceString(nameof(Resources.SEC006_Description), Resources.ResourceManager, typeof(Resources));
+
+    private static readonly LocalizableString Title_SEC007 = new LocalizableResourceString(nameof(Resources.SEC007_Title), Resources.ResourceManager, typeof(Resources));
+    private static readonly LocalizableString Message_SEC007 = new LocalizableResourceString(nameof(Resources.SEC007_MessageFormat), Resources.ResourceManager, typeof(Resources));
+    private static readonly LocalizableString Desc_SEC007 = new LocalizableResourceString(nameof(Resources.SEC007_Description), Resources.ResourceManager, typeof(Resources));
+
+    private static readonly LocalizableString Title_SEC008 = new LocalizableResourceString(nameof(Resources.SEC008_Title), Resources.ResourceManager, typeof(Resources));
+    private static readonly LocalizableString Message_SEC008 = new LocalizableResourceString(nameof(Resources.SEC008_MessageFormat), Resources.ResourceManager, typeof(Resources));
+    private static readonly LocalizableString Desc_SEC008 = new LocalizableResourceString(nameof(Resources.SEC008_Description), Resources.ResourceManager, typeof(Resources));
+
+    private static readonly LocalizableString Title_SEC009 = new LocalizableResourceString(nameof(Resources.SEC009_Title), Resources.ResourceManager, typeof(Resources));
+    private static readonly LocalizableString Message_SEC009 = new LocalizableResourceString(nameof(Resources.SEC009_MessageFormat), Resources.ResourceManager, typeof(Resources));
+    private static readonly LocalizableString Desc_SEC009 = new LocalizableResourceString(nameof(Resources.SEC009_Description), Resources.ResourceManager, typeof(Resources));
+
+    private static readonly LocalizableString Title_SEC010 = new LocalizableResourceString(nameof(Resources.SEC010_Title), Resources.ResourceManager, typeof(Resources));
+    private static readonly LocalizableString Message_SEC010 = new LocalizableResourceString(nameof(Resources.SEC010_MessageFormat), Resources.ResourceManager, typeof(Resources));
+    private static readonly LocalizableString Desc_SEC010 = new LocalizableResourceString(nameof(Resources.SEC010_Description), Resources.ResourceManager, typeof(Resources));
+
+    private static readonly LocalizableString Title_SEC011 = new LocalizableResourceString(nameof(Resources.SEC011_Title), Resources.ResourceManager, typeof(Resources));
+    private static readonly LocalizableString Message_SEC011 = new LocalizableResourceString(nameof(Resources.SEC011_MessageFormat), Resources.ResourceManager, typeof(Resources));
+    private static readonly LocalizableString Desc_SEC011 = new LocalizableResourceString(nameof(Resources.SEC011_Description), Resources.ResourceManager, typeof(Resources));
+    #endregion
+
+    #region Diagnostic Descriptors
+    private static readonly DiagnosticDescriptor Rule = new DiagnosticDescriptor(
+        DiagnosticId, Title_CHN001, Message_CHN001, "CodeStyle", DiagnosticSeverity.Warning, isEnabledByDefault: true, description: Desc_CHN001);
+    
+    private static readonly DiagnosticDescriptor MissingDllImportSearchPathsRule = new DiagnosticDescriptor(
+        DLL002Id, Title_DLL002, Message_DLL002, "CodeStyle", DiagnosticSeverity.Warning, isEnabledByDefault: true, description: Desc_DLL002);
+    
+    private static readonly DiagnosticDescriptor InvalidStackTraceUsageRule = new DiagnosticDescriptor(
+        EXC001Id, Title_EXC001, Message_EXC001, "Security", DiagnosticSeverity.Warning, isEnabledByDefault: true, description: Desc_EXC001);
+    
+    private static readonly DiagnosticDescriptor UnsafeDllSignatureRule = new DiagnosticDescriptor(
+        DLL003Id, Title_DLL003, Message_DLL003, "Security", DiagnosticSeverity.Warning, isEnabledByDefault: true, description: Desc_DLL003);
+    
+    private static readonly DiagnosticDescriptor InvalidCommentedCodeRule = new DiagnosticDescriptor(
+        CODE001Id, Title_CODE001, Message_CODE001, "CodeStyle", DiagnosticSeverity.Warning, isEnabledByDefault: true, description: Desc_CODE001);
+    
+    private static readonly DiagnosticDescriptor SensitiveInfoInCodeRule = new DiagnosticDescriptor(
+        SEC001Id, Title_SEC001, Message_SEC001, "Security", DiagnosticSeverity.Warning, isEnabledByDefault: true, description: Desc_SEC001);
+    
+    private static readonly DiagnosticDescriptor PathTraversalRule = new DiagnosticDescriptor(
+        SEC002Id, Title_SEC002, Message_SEC002, "Security", DiagnosticSeverity.Warning, isEnabledByDefault: true, description: Desc_SEC002);
+    
+    private static readonly DiagnosticDescriptor SqlInjectionRule = new DiagnosticDescriptor(
+        SEC003Id, Title_SEC003, Message_SEC003, "Security", DiagnosticSeverity.Warning, isEnabledByDefault: true, description: Desc_SEC003);
+    
+    private static readonly DiagnosticDescriptor UnsafeDeserializationRule = new DiagnosticDescriptor(
+        SEC004Id, Title_SEC004, Message_SEC004, "Security", DiagnosticSeverity.Warning, isEnabledByDefault: true, description: Desc_SEC004);
+    
+    private static readonly DiagnosticDescriptor InsecureRandomRule = new DiagnosticDescriptor(
+        SEC005Id, Title_SEC005, Message_SEC005, "Security", DiagnosticSeverity.Warning, isEnabledByDefault: true, description: Desc_SEC005);
+    
+    private static readonly DiagnosticDescriptor RegexDosRule = new DiagnosticDescriptor(
+        SEC006Id, Title_SEC006, Message_SEC006, "Security", DiagnosticSeverity.Warning, isEnabledByDefault: true, description: Desc_SEC006);
+    
+    private static readonly DiagnosticDescriptor ResourceLeakRule = new DiagnosticDescriptor(
+        SEC007Id, Title_SEC007, Message_SEC007, "Security", DiagnosticSeverity.Warning, isEnabledByDefault: true, description: Desc_SEC007);
+    
+    private static readonly DiagnosticDescriptor InsecureTempFileRule = new DiagnosticDescriptor(
+        SEC008Id, Title_SEC008, Message_SEC008, "Security", DiagnosticSeverity.Warning, isEnabledByDefault: true, description: Desc_SEC008);
+    
+    private static readonly DiagnosticDescriptor UnsafeReflectionRule = new DiagnosticDescriptor(
+        SEC009Id, Title_SEC009, Message_SEC009, "Security", DiagnosticSeverity.Warning, isEnabledByDefault: true, description: Desc_SEC009);
+    
+    private static readonly DiagnosticDescriptor RaceConditionRule = new DiagnosticDescriptor(
+        SEC010Id, Title_SEC010, Message_SEC010, "Security", DiagnosticSeverity.Warning, isEnabledByDefault: true, description: Desc_SEC010);
+    
     private static readonly DiagnosticDescriptor InsecureIpcRule = new DiagnosticDescriptor(
-        SEC011Id, "SEC011", "SEC011", "Security", DiagnosticSeverity.Warning, isEnabledByDefault: true);
+        SEC011Id, Title_SEC011, Message_SEC011, "Security", DiagnosticSeverity.Warning, isEnabledByDefault: true, description: Desc_SEC011);
+    #endregion
 
     public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics
         => ImmutableArray.Create(
@@ -132,20 +223,33 @@ public class LenovoQiraCodeAnalyzerAnalyzer : DiagnosticAnalyzer
         "BasicHttpBinding", "WebHttpBinding"
     };
 
-    
+    private static readonly Dictionary<string, DiagnosticDescriptor> DescriptorMap = new Dictionary<string, DiagnosticDescriptor>
+    {
+        [DiagnosticId] = Rule,
+        [DLL002Id] = MissingDllImportSearchPathsRule,
+        [DLL003Id] = UnsafeDllSignatureRule,
+        [EXC001Id] = InvalidStackTraceUsageRule,
+        [CODE001Id] = InvalidCommentedCodeRule,
+        [SEC001Id] = SensitiveInfoInCodeRule,
+        [SEC002Id] = PathTraversalRule,
+        [SEC003Id] = SqlInjectionRule,
+        [SEC004Id] = UnsafeDeserializationRule,
+        [SEC005Id] = InsecureRandomRule,
+        [SEC006Id] = RegexDosRule,
+        [SEC007Id] = ResourceLeakRule,
+        [SEC008Id] = InsecureTempFileRule,
+        [SEC009Id] = UnsafeReflectionRule,
+        [SEC010Id] = RaceConditionRule,
+        [SEC011Id] = InsecureIpcRule
+    };
+
     private void Report(Action<Diagnostic> reportAction, string ruleId, string category, DiagnosticSeverity severity, Location location, params object[] messageArgs)
     {
-        string title = AnalyzerI18n.GetString(ruleId + "_Title");
-        string messageFormat = AnalyzerI18n.GetString(ruleId + "_MessageFormat");
-        string description = AnalyzerI18n.GetString(ruleId + "_Description");
-
-        for (int i = 0; i < messageArgs.Length; i++)
-        {
-            if (messageArgs[i] is LocalizableArgument la)
-            {
-                messageArgs[i] = la.ToString(null, null);
-            }
-        }
+        var culture = AnalyzerLanguageSettings.GetCulture();
+        
+        string title = Resources.ResourceManager.GetString(ruleId + "_Title", culture) ?? ruleId;
+        string messageFormat = Resources.ResourceManager.GetString(ruleId + "_MessageFormat", culture) ?? ruleId;
+        string description = Resources.ResourceManager.GetString(ruleId + "_Description", culture);
 
         var descriptor = new DiagnosticDescriptor(
             ruleId,
@@ -290,7 +394,7 @@ public class LenovoQiraCodeAnalyzerAnalyzer : DiagnosticAnalyzer
 
         if (!hasSearchPathsAttr)
         {
-            Report(context.ReportDiagnostic, DLL002Id, "CodeStyle", DiagnosticSeverity.Warning, dllImportAttrs.First().GetLocation()));
+            Report(context.ReportDiagnostic, DLL002Id, "CodeStyle", DiagnosticSeverity.Warning, dllImportAttrs.First().GetLocation());
         }
 
         foreach (var dllImportAttr in dllImportAttrs)
@@ -300,7 +404,7 @@ public class LenovoQiraCodeAnalyzerAnalyzer : DiagnosticAnalyzer
             if (string.IsNullOrEmpty(dllName))
             {
                 Report(context.ReportDiagnostic, DLL003Id, "Security", DiagnosticSeverity.Warning, dllImportAttr.GetLocation(),
-                    new LocalizableArgument("DLL003_Arg_Unknown");
+                    new LocalizableArgument("DLL003_Arg_Unknown"));
                 continue;
             }
 
@@ -2115,7 +2219,7 @@ public class LenovoQiraCodeAnalyzerAnalyzer : DiagnosticAnalyzer
         return false;
     }
 
-    internal class LocalizableArgument : IFormattable
+    internal class LocalizableArgument
     {
         private readonly string _key;
         private readonly object[] _args;
@@ -2126,19 +2230,23 @@ public class LenovoQiraCodeAnalyzerAnalyzer : DiagnosticAnalyzer
             _args = args;
         }
 
-        public override string ToString() => ToString(null, null);
-
-        public string ToString(string format, IFormatProvider formatProvider)
+        public override string ToString()
         {
-            var culture = formatProvider as System.Globalization.CultureInfo;
-            string localizedString = LenovoAnalyzer.Resources.ResourceManager.GetString(_key, culture);
-            if (string.IsNullOrEmpty(localizedString)) localizedString = _key;
+            var culture = AnalyzerLanguageSettings.GetCulture();
+            string localizedFormat = Resources.ResourceManager.GetString(_key, culture) ?? _key;
             
             if (_args != null && _args.Length > 0)
             {
-                return string.Format(culture, localizedString, _args);
+                try
+                {
+                    return string.Format(localizedFormat, _args);
+                }
+                catch
+                {
+                    return localizedFormat;
+                }
             }
-            return localizedString;
+            return localizedFormat;
         }
     }
 }

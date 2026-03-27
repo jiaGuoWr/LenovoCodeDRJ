@@ -154,10 +154,63 @@
   </data>
 
 
+  <data name="Lang_Auto" xml:space="preserve">
+    <value>跟随系统</value>
+  </data>
   <data name="Lang_English" xml:space="preserve">
     <value>英语 (English)</value>
   </data>
   <data name="Lang_Chinese" xml:space="preserve">
     <value>简体中文</value>
+  </data>
+
+  <!-- Diagnostic Messages -->
+  <data name="Diag_CHN001" xml:space="preserve">
+    <value>注释中包含中文内容</value>
+  </data>
+  <data name="Diag_DLL002" xml:space="preserve">
+    <value>DllImport 缺少 DefaultDllImportSearchPaths 属性</value>
+  </data>
+  <data name="Diag_DLL003" xml:space="preserve">
+    <value>DLL 签名不安全或未签名</value>
+  </data>
+  <data name="Diag_EXC001" xml:space="preserve">
+    <value>catch 块中不应打印完整堆栈信息</value>
+  </data>
+  <data name="Diag_CODE001" xml:space="preserve">
+    <value>注释中包含无效代码片段</value>
+  </data>
+  <data name="Diag_SEC001" xml:space="preserve">
+    <value>代码中存在硬编码的敏感信息</value>
+  </data>
+  <data name="Diag_SEC002" xml:space="preserve">
+    <value>文件路径操作可能存在路径遍历漏洞</value>
+  </data>
+  <data name="Diag_SEC003" xml:space="preserve">
+    <value>SQL 查询可能存在注入风险</value>
+  </data>
+  <data name="Diag_SEC004" xml:space="preserve">
+    <value>使用了不安全的反序列化器</value>
+  </data>
+  <data name="Diag_SEC005" xml:space="preserve">
+    <value>System.Random 不适用于安全敏感场景</value>
+  </data>
+  <data name="Diag_SEC006" xml:space="preserve">
+    <value>正则表达式未设置超时，可能导致 ReDoS</value>
+  </data>
+  <data name="Diag_SEC007" xml:space="preserve">
+    <value>IDisposable 对象未正确释放</value>
+  </data>
+  <data name="Diag_SEC008" xml:space="preserve">
+    <value>临时文件操作可能存在安全问题</value>
+  </data>
+  <data name="Diag_SEC009" xml:space="preserve">
+    <value>反射调用使用了用户可控的输入</value>
+  </data>
+  <data name="Diag_SEC010" xml:space="preserve">
+    <value>多线程环境中使用非线程安全的集合</value>
+  </data>
+  <data name="Diag_SEC011" xml:space="preserve">
+    <value>使用了不安全的 WCF 绑定</value>
   </data>
 </root>

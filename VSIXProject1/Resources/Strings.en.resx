@@ -154,10 +154,63 @@
   </data>
 
 
+  <data name="Lang_Auto" xml:space="preserve">
+    <value>Follow System</value>
+  </data>
   <data name="Lang_English" xml:space="preserve">
     <value>English</value>
   </data>
   <data name="Lang_Chinese" xml:space="preserve">
     <value>Chinese Simplified</value>
+  </data>
+
+  <!-- Diagnostic Messages -->
+  <data name="Diag_CHN001" xml:space="preserve">
+    <value>Comment contains Chinese characters</value>
+  </data>
+  <data name="Diag_DLL002" xml:space="preserve">
+    <value>DllImport missing DefaultDllImportSearchPaths attribute</value>
+  </data>
+  <data name="Diag_DLL003" xml:space="preserve">
+    <value>DLL signature unsafe or unsigned</value>
+  </data>
+  <data name="Diag_EXC001" xml:space="preserve">
+    <value>Full stack trace should not be printed in catch block</value>
+  </data>
+  <data name="Diag_CODE001" xml:space="preserve">
+    <value>Comment contains invalid code fragment</value>
+  </data>
+  <data name="Diag_SEC001" xml:space="preserve">
+    <value>Hardcoded sensitive information in code</value>
+  </data>
+  <data name="Diag_SEC002" xml:space="preserve">
+    <value>File path operation may have path traversal vulnerability</value>
+  </data>
+  <data name="Diag_SEC003" xml:space="preserve">
+    <value>SQL query may be vulnerable to injection</value>
+  </data>
+  <data name="Diag_SEC004" xml:space="preserve">
+    <value>Using unsafe deserializer</value>
+  </data>
+  <data name="Diag_SEC005" xml:space="preserve">
+    <value>System.Random not suitable for security-sensitive scenarios</value>
+  </data>
+  <data name="Diag_SEC006" xml:space="preserve">
+    <value>Regex has no timeout, may cause ReDoS</value>
+  </data>
+  <data name="Diag_SEC007" xml:space="preserve">
+    <value>IDisposable object not properly disposed</value>
+  </data>
+  <data name="Diag_SEC008" xml:space="preserve">
+    <value>Temporary file operation may have security issues</value>
+  </data>
+  <data name="Diag_SEC009" xml:space="preserve">
+    <value>Reflection call uses user-controllable input</value>
+  </data>
+  <data name="Diag_SEC010" xml:space="preserve">
+    <value>Using non-thread-safe collection in multi-threaded context</value>
+  </data>
+  <data name="Diag_SEC011" xml:space="preserve">
+    <value>Using insecure WCF binding</value>
   </data>
 </root>
